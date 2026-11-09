@@ -17,6 +17,12 @@ Cambiar el modelo es útil para que un juego aplique un preset gráfico en vez d
 terceros, no trae binarios ajenos. Ver [PROCEDENCIA.md](PROCEDENCIA.md) para el detalle
 de qué se tomó como referencia del proyecto original y qué se descartó, con nombre y motivo.
 
+## Con qué gestor funciona
+
+**Shizuku (Rikka) y OmniShizuku, sin cambiar nada.** Comprobado: los dos declaran el
+mismo permiso `moe.shizuku.manager.permission.API_V23`. Detalle y por qué Dhizuku no
+sirve para esto: [COMPATIBILIDAD.md](COMPATIBILIDAD.md).
+
 ## Las tres vías, y la cuarta que es decir la verdad
 
 | Vía | ¿Root? | Escribe propiedades |
