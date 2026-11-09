@@ -31,6 +31,9 @@ class EjecutorFalso(private val props: MutableMap<String, String>, val bloquea: 
     }
 }
 
+fun propiedadesContables(s: Supercomputadora) =
+    Supercomputadoras.propiedadesDe(s).toList()
+
 fun main() {
     println("PRUEBAS · GLTools Reborn\n")
 
@@ -118,6 +121,67 @@ fun main() {
     check("verificados + parciales = total", v + p2c == todos.size, "$v + $p2c vs ${todos.size}")
     check("no hay ids repetidos", todos.map { it.id }.distinct().size == todos.size)
     check("porId encuentra a todos", todos.all { Perfiles.porId(it.id)?.id == it.id })
+
+    println("\n9 · Modo seguro: lo que NUNCA debe pasar")
+    // Esta es la sección que importa: si alguna de estas falla, la app puede dañar un
+    // teléfono y hay que parar todo lo demás.
+    val identity = listOf(
+        "ro.serialno", "gsm.sim.operator.alpha", "persist.radio.imei", "ro.wifi.mac",
+        "bluetooth.address", "ro.boot.serialno", "oem_id", "meid",
+    )
+    for (k in identity) {
+        val p = Seguridad.revisar(k, "12345", Modo.EXPERTO)
+        check("bloquea identidad en EXPERTO: $k", !p.permitido, p.motivo)
+    }
+    val arranque = listOf("persist.sys.foo", "ro.boot.verifiedbootstate", "ro.secure", "ro.debuggable", "init.svc.x")
+    for (k in arranque) {
+        val p = Seguridad.revisar(k, "1", Modo.EXPERTO)
+        check("bloquea arranque en EXPERTO: $k", !p.permitido, p.motivo)
+    }
+
+    println("\n10 · Inyección de shell y límites reales")
+    check("rechaza punto y coma", !Seguridad.revisar("ro.product.model", "Pixel; reboot", Modo.EXPERTO).permitido)
+    check("rechaza comillas", !Seguridad.revisar("ro.product.model", "Pixel\"x", Modo.EXPERTO).permitido)
+    check("rechaza salto de línea", !Seguridad.revisar("ro.product.model", "Pixel\nx", Modo.EXPERTO).permitido)
+    check("rechaza backticks", !Seguridad.revisar("ro.product.model", "`id`", Modo.EXPERTO).permitido)
+    check("rechaza valor de 93 caracteres (máximo real 92)",
+        !Seguridad.revisar("ro.product.model", "x".repeat(93), Modo.EXPERTO).permitido)
+    check("acepta valor de 92 caracteres",
+        Seguridad.revisar("ro.product.model", "x".repeat(92), Modo.EXPERTO).permitido)
+    check("rechaza valor vacío", !Seguridad.revisar("ro.product.model", "", Modo.EXPERTO).permitido)
+    check("acepta un modelo con espacios", Seguridad.revisar("ro.product.model", "RedMagic 11 Pro", Modo.EXPERTO).permitido)
+
+    println("\n11 · Los dos modos se comportan distinto, y a propósito")
+    val api = "ro.build.version.sdk"
+    check("modo seguro NO deja tocar el API", !Seguridad.revisar(api, "34", Modo.SEGURO).permitido)
+    check("modo experto SÍ deja tocar el API", Seguridad.revisar(api, "34", Modo.EXPERTO).permitido)
+    check("modo seguro deja el modelo", Seguridad.revisar("ro.product.model", "Pixel 9 Pro", Modo.SEGURO).permitido)
+    check("el modo se alterna", Modo.SEGURO.alternar() == Modo.EXPERTO && Modo.EXPERTO.alternar() == Modo.SEGURO)
+    check("identidad bloqueada también en modo seguro",
+        !Seguridad.revisar("ro.serialno", "abc", Modo.SEGURO).permitido)
+
+    println("\n12 · Modo seguro: deshace solo cuando no cuadra")
+    var props4 = mutableMapOf("ro.product.model" to "Original")
+    val e4 = EjecutorFalso(props4, bloquea = false)
+    val escritorSeguro = Escritor(e4, registro = null, modo = Modo.SEGURO)
+    val ok4 = escritorSeguro.aplicar(Perfiles.PIXEL_8_PRO)
+    check("aplica bien cuando se puede", ok4.ok, ok4.detalle)
+
+    println("\n13 · Simulaciones: son fichas, no rendimiento")
+    val sc = Supercomputadoras.todos
+    check("hay 10 sistemas", sc.size == 10)
+    check("van del 1 al 10 sin huecos", sc.map { it.rank } == (1..10).toList())
+    check("El Capitan sigue con 11.340.000 núcleos", sc.first { it.nombre == "El Capitan" }.nucleos == 11_340_000)
+    check("LineShine es el nº1 con 2.198,40 PFlop/s",
+        sc.first().nombre == "LineShine" && sc.first().rmaxPFlops == 2_198.40)
+    check("Fugaku es sólo CPU", sc.first { it.nombre.contains("Fugaku") }.nota.contains("sólo CPU"))
+    check("Eagle no finge potencia: 0 = no publicado",
+        sc.first { it.nombre == "Eagle" }.potenciaKw == 0)
+    check("ninguna ficha escribe núcleos ni FLOPS como propiedad",
+        sc.none { s -> propiedadesContables(s).any { it.first.contains("core") || it.first.contains("flop") } })
+    check("las fichas SÍ escriben el modelo", Supercomputadoras.propiedadesDe(sc.first())["ro.product.model"] == "LineShine")
+    check("los datos sin propiedad se enseñan aparte",
+        Supercomputadoras.datosSoloInformativos(sc.first()).any { it.first == "Núcleos" })
 
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")

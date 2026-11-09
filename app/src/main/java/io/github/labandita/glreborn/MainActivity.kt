@@ -67,6 +67,8 @@ private fun App(
     var apps by remember { mutableStateOf<List<Inventario.App>>(emptyList()) }
     var lineasDiag by remember { mutableStateOf<List<Diagnostico.Linea>>(emptyList()) }
     var limites by remember { mutableStateOf<List<String>>(emptyList()) }
+    var modo by remember { mutableStateOf(director.modo) }
+    var superActiva by remember { mutableStateOf<Supercomputadora?>(null) }
 
     fun releer() {
         onRefrescar()
@@ -89,6 +91,29 @@ private fun App(
         apps = apps,
         lineasDiag = lineasDiag,
         limites = limites,
+        modo = modo,
+        superActiva = superActiva,
+        onModo = {
+            modo = director.cambiarModo()
+            resultado = Resultado(
+                true, Via.NINGUNA,
+                if (modo == Modo.SEGURO)
+                    "Modo seguro: sólo modelo y gráficos. Si algo no cuadra al releer, se deshace solo."
+                else
+                    "Modo experto: también kernel, API y build. Cada escritura se anota antes de " +
+                        "hacerse y se deshace sola si la app muere a mitad. La identidad del teléfono " +
+                        "sigue bloqueada.",
+            )
+        },
+        onSimular = { s ->
+            superActiva = s
+            resultado = director.simular(s)
+            actual = director.telefoniaActual()
+        },
+        onDeshacer = {
+            resultado = director.restaurar()
+            actual = director.telefoniaActual()
+        },
         onPerfil = { perfil = it },
         onAplicar = {
             val p = perfil

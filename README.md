@@ -31,7 +31,24 @@ ese estado la app se abre, lee lo que puede, y muestra **SIN VÍA** en rojo arri
 botones de aplicar existen pero responden «No se aplicó nada». Una app que dijera
 «aplicado» ahí estaría mintiendo.
 
-## Las cuatro pantallas
+## Modo seguro y modo experto
+
+Hay un interruptor arriba, siempre visible.
+
+- **Seguro** (por defecto): sólo modelo, marca, placa, hardware y OpenGL ES. Si algo no
+  cuadra al releer, **se deshace solo** y te dice que el teléfono está como estaba.
+- **Experto**: añade API, versión de Android, huella de compilación y kernel. Cada
+  escritura se anota antes de hacerse, y si la app muere a mitad se recupera sola al
+  abrirla.
+
+Lo que **ningún** modo permite: tocar IMEI, número de serie, MAC o Android ID, ni
+`persist.*`, `ro.boot.*`, `ro.secure`. Esas listas están en `core/Seguridad.kt` y a la
+vista en Diagnóstico. El detalle completo está en [SEGURIDAD.md](SEGURIDAD.md).
+
+**No hay «acceso total»**, ni con el modo experto. Sin root no existe, y con root esta app
+no lo necesita: no hay un botón que finja dártelo.
+
+## Las cinco pantallas
 
 - **Perfiles** — el estado real del teléfono arriba, el catálogo con su nivel de confianza,
   y *Aplicar* / *Restaurar*. Cada card dice si está VERIFICADO o PARCIAL y **qué falta**.
@@ -39,14 +56,17 @@ botones de aplicar existen pero responden «No se aplicó nada». Una app que di
   mismo que no hay lista blanca: si tu app no aparece, es que no está instalada.
 - **GPU** — lo que declara el teléfono y la regla del formato: `196610` es OpenGL ES 3.2.
   Poner el texto «OpenGL ES 3.2» en esa propiedad no la cambia, la rompe.
-- **Diagnóstico** — cada afirmación con su estado, y una lista explícita de lo que esta
-  app **no** puede hacer. Esa lista está a la vista, no en un pie de página.
+- **Super** — diez fichas del TOP500, con los datos de la lista vigente. **Son simulación**:
+  el teléfono *declara* llamarse LineShine; no tiene sus 13.789.440 núcleos. Va aquí y no
+  en Perfiles para que nunca se confunda con un perfil de dispositivo.
+- **Diagnóstico** — cada afirmación con su estado, las listas del filtro completas, y una
+  lista explícita de lo que esta app **no** puede hacer. A la vista, no en un pie.
 
 ## Compilar
 
 ```bash
 ./gradlew :app:assembleDebug          # APK de depuración
-./gradlew :app:pruebasNucleo          # 26 pruebas del núcleo, sin emulador
+./gradlew :app:pruebasNucleo          # 51 pruebas del núcleo, sin emulador
 ```
 
 Para firmar el release hacen falta variables de entorno; **no hay ninguna clave en el

@@ -1,13 +1,18 @@
 package io.github.labandita.glreborn.core
 
 /**
- * Aplica un perfil: escribe las propiedades y COMPRUEBA que quedaron.
+ * Aplica un perfil: pasa cada escritura por el filtro de seguridad, la anota ANTES de
+ * hacerla y la confirma DESPUÉS releyendo.
  *
- * Se escriben sólo las propiedades que el perfil declara con valor. Las vacías se
- * saltan a propósito —son las que no se pudieron verificar— y se informa cuántas se
- * saltaron, porque un perfil a medias aplicado en silencio es peor que un error.
+ * El orden importa y es lo que separa esta app de una que dice «listo» y te deja el
+ * teléfono raro: primero se comprueba si se puede, luego se apunta qué había, luego se
+ * escribe, y al final se lee para ver si de verdad cambió.
  */
-class Escritor(private val ejecutor: Ejecutor) {
+class Escritor(
+    private val ejecutor: Ejecutor,
+    private val registro: Registro? = null,
+    private val modo: Modo = Modo.SEGURO,
+) {
 
     private val propiedades = listOf(
         "ro.product.brand" to { p: PerfilDispositivo -> p.marca },
@@ -32,7 +37,7 @@ class Escritor(private val ejecutor: Ejecutor) {
         val lineas = mutableListOf<String>()
         var escritas = 0
         var omitidas = 0
-        var errores = 0
+        var bloqueadas = 0
 
         for ((prop, sel) in propiedades) {
             val valor = sel(perfil)
@@ -41,13 +46,20 @@ class Escritor(private val ejecutor: Ejecutor) {
                 lineas += "· $prop — omitida (el perfil no tiene dato verificado)"
                 continue
             }
-            val ok = escribirPropiedad(prop, valor)
-            if (!ok) {
-                errores++
-                lineas += "✗ $prop — no se pudo ejecutar"
-            } else {
+
+            // El filtro manda. Si dice no, no se escribe, y se dice por qué.
+            val permiso = Seguridad.revisar(prop, valor, modo)
+            if (!permiso.permitido) {
+                bloqueadas++
+                lineas += "⛔ $prop — bloqueada: ${permiso.motivo}"
+                continue
+            }
+
+            if (escribirConRegistro(prop, valor)) {
                 escritas++
-                lineas += "✓ $prop = $valor"
+                lineas += "✓ $prop = $valor" + if (permiso.aviso.isNotBlank()) "  (${permiso.aviso})" else ""
+            } else {
+                lineas += "✗ $prop — no se pudo ejecutar"
             }
         }
 
@@ -61,30 +73,70 @@ class Escritor(private val ejecutor: Ejecutor) {
             lineas += "⚠ ${c.prop}: se escribió «${c.esperado}» y el sistema lee «${c.obtenido}»"
         }
 
+        // Modo seguro: si algo no cuadró, se devuelve solo. Es la diferencia entre
+        // «no funcionó» y «no funcionó y además te lo dejé a medias».
+        var autoDeshecho = false
+        if (modo == Modo.SEGURO && noCuadran.isNotEmpty() && registro != null) {
+            val r = registro.deshacerTodo(ejecutor)
+            autoDeshecho = true
+            lineas += "↩ modo seguro: deshecho automático — ${r.detalle}"
+        }
+
         return Resultado(
-            ok = errores == 0 && noCuadran.isEmpty() && escritas > 0,
+            ok = noCuadran.isEmpty() && escritas > 0,
             via = ejecutor.via,
             detalle = when {
+                escritas == 0 && bloqueadas > 0 -> "El modo seguro bloqueó todo lo que se intentó escribir."
                 escritas == 0 -> "No se escribió nada."
+                noCuadran.isNotEmpty() && autoDeshecho ->
+                    "$escritas escritas, pero ${noCuadran.size} no cuadraron y el modo seguro las devolvió. " +
+                        "Tu teléfono está como estaba."
                 noCuadran.isNotEmpty() ->
                     "$escritas escritas, $confirmadas confirmadas, ${noCuadran.size} no cuadran. " +
-                        "Algunos fabricantes bloquean estas propiedades: si no cuadran, no cambiaron."
+                        "El fabricante bloquea esas propiedades: si no cuadran, no cambiaron."
                 else -> "$escritas propiedades escritas y $confirmadas confirmadas por lectura. " +
-                    "($omitidas omitidas por falta de dato verificado.)"
+                    "($omitidas sin dato, $bloqueadas bloqueadas por el filtro.)"
             },
             lineas = lineas,
         )
     }
 
-    /**
-     * Escribe por la vía que toque. Con Shizuku se usa su API de propiedades —no un
-     * shell, que es lo que esa API resuelve—; con root, `setprop` por `su`.
-     */
+    /** Anota el valor anterior, escribe, y sólo entonces da por hecho que se intentó. */
+    private fun escribirConRegistro(clave: String, valor: String): Boolean {
+        val antes = leerPropiedad(clave)
+        // Se apunta ANTES de escribir: si el proceso muere aquí, queda dicho qué devolver.
+        registro?.apuntar(clave, antes, valor, modo)
+        return escribirPropiedad(clave, valor)
+    }
+
+    private fun leerPropiedad(clave: String): String = when (val e = ejecutor) {
+        is io.github.labandita.glreborn.shizuku.EjecutorShizuku -> e.leer(clave) ?: ""
+        else -> (e.ejecutar("getprop $clave") ?: "").trim()
+    }
+
     private fun escribirPropiedad(prop: String, valor: String): Boolean =
         when (val e = ejecutor) {
             is io.github.labandita.glreborn.shizuku.EjecutorShizuku -> e.escribir(prop, valor)
             else -> e.ejecutar("setprop $prop '$valor'") != null
         }
+
+    /** Escribe una propiedad suelta, con filtro. Para el modo experto. */
+    fun escribirSuelta(clave: String, valor: String): Resultado {
+        if (!ejecutor.disponible()) return Resultado(false, Via.NINGUNA, "Sin vía: no se escribió nada.")
+        val permiso = Seguridad.revisar(clave, valor, modo)
+        if (!permiso.permitido) {
+            return Resultado(false, ejecutor.via, "Bloqueada: ${permiso.motivo}")
+        }
+        val ok = escribirConRegistro(clave, valor)
+        val leido = leerPropiedad(clave)
+        return Resultado(
+            ok = ok && leido == valor,
+            via = ejecutor.via,
+            detalle = if (leido == valor) "$clave = $valor (confirmado)"
+            else "Se intentó escribir «$valor» y el sistema lee «$leido».",
+            lineas = listOfNotNull(permiso.aviso.takeIf { it.isNotBlank() }),
+        )
+    }
 
     /** Devuelve el teléfono a lo que declaró al abrir la app. */
     fun restaurar(original: Map<String, String>): Resultado {
@@ -95,6 +147,7 @@ class Escritor(private val ejecutor: Ejecutor) {
             escribirPropiedad(prop, valor)
             n++
         }
+        registro?.let { it.historial() }
         return Resultado(true, ejecutor.via, "$n propiedades devueltas a su valor original.")
     }
 }

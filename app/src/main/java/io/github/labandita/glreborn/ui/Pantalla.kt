@@ -21,9 +21,10 @@ import io.github.labandita.glreborn.core.*
 
 enum class Seccion(val titulo: String) {
     PERFILES("Perfiles"),
+    SUPER("Super"),
     APLICACIONES("Apps"),
     GPU("GPU"),
-    DIAGNOSTICO("Diagnóstico"),
+    DIAGNOSTICO("Diag."),
 }
 
 @Composable
@@ -36,6 +37,11 @@ fun PantallaPrincipal(
     apps: List<Inventario.App>,
     lineasDiag: List<Diagnostico.Linea>,
     limites: List<String>,
+    modo: Modo,
+    superActiva: Supercomputadora?,
+    onModo: () -> Unit,
+    onSimular: (Supercomputadora) -> Unit,
+    onDeshacer: () -> Unit,
     onPerfil: (PerfilDispositivo) -> Unit,
     onAplicar: () -> Unit,
     onRestaurar: () -> Unit,
@@ -53,7 +59,9 @@ fun PantallaPrincipal(
                 Text("Perfiles de dispositivo", style = MaterialTheme.typography.headlineMedium, color = Colores.texto)
                 Spacer(Modifier.height(10.dp))
                 BarraEstado(estadoVia, director.descripcion())
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(10.dp))
+                BarraModo(modo, onModo)
+                Spacer(Modifier.height(10.dp))
                 Pestanas(seccion) { seccion = it }
             }
         },
@@ -79,10 +87,40 @@ fun PantallaPrincipal(
                             Boton("Restaurar", Colores.superficieAlta, Modifier.weight(1f)) { onRestaurar() }
                         }
                     }
+                    item {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Boton("Deshacer todo", Colores.ambar, Modifier.weight(1f)) { onDeshacer() }
+                        }
+                    }
                     resultado?.let { r ->
                         item { Spacer(Modifier.height(6.dp)) }
                         item { Etiqueta("RESULTADO DE LA ÚLTIMA ACCIÓN") }
                         item { TarjetaResultado(r) }
+                    }
+                }
+
+                Seccion.SUPER -> {
+                    item {
+                        Aviso(
+                            "SIMULACIÓN, no rendimiento. Estas fichas hacen que el teléfono DECLARE " +
+                                "los datos de un sistema real del TOP500. No añaden núcleos, ni memoria, " +
+                                "ni gigaflops: tu teléfono sigue teniendo los que tiene. Sirven para " +
+                                "probar cómo reacciona una app a esos valores, y nada más.",
+                            Colores.rojo,
+                        )
+                    }
+                    item { Etiqueta("TOP500 · ${Supercomputadoras.censo()}") }
+                    items(Supercomputadoras.todos) { s ->
+                        TarjetaSuper(s, superActiva?.rank == s.rank) { onSimular(s) }
+                    }
+                    item { Spacer(Modifier.height(4.dp)) }
+                    item {
+                        Aviso(
+                            "Los núcleos, FLOPS y potencia NO tienen propiedad en Android: no existe " +
+                                "la clave donde escribirlos. Se enseñan como información del sistema real, " +
+                                "no como algo que esta app pueda simular. Escribirlos sería inventar.",
+                            Colores.ambar,
+                        )
                     }
                 }
 
@@ -135,6 +173,23 @@ fun PantallaPrincipal(
                     item { Etiqueta("ESTADO MEDIDO") }
                     items(lineasDiag) { l -> FilaDiag(l) }
                     item { Spacer(Modifier.height(6.dp)) }
+                    item { Etiqueta("EL FILTRO DE SEGURIDAD, A LA VISTA") }
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Seguridad.resumenListas().forEach { (titulo, lista) ->
+                                Column(
+                                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                        .background(Colores.superficie).padding(12.dp),
+                                ) {
+                                    Text(titulo, fontSize = 10.sp, letterSpacing = 0.8.sp,
+                                        color = Colores.textoSuave, fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.height(3.dp))
+                                    Text(lista, fontSize = 11.sp, lineHeight = 15.sp,
+                                        color = Colores.texto, fontFamily = FontFamily.Monospace)
+                                }
+                            }
+                        }
+                    }
                     item { Etiqueta("LO QUE ESTA APP NO PUEDE HACER") }
                     item {
                         Column(
@@ -369,6 +424,82 @@ private fun Pie() {
                 "comprobación de compra, ni telemetría. Los perfiles viajan dentro del APK: si el " +
                 "teléfono está en modo avión, todo funciona igual.",
             fontSize = 12.sp, lineHeight = 17.sp, color = Colores.textoSuave,
+        )
+    }
+}
+
+/** El interruptor del modo. Es la decisión más importante de la pantalla, así que se ve siempre. */
+@Composable
+private fun BarraModo(modo: Modo, onModo: () -> Unit) {
+    val color = if (modo == Modo.SEGURO) Colores.verde else Colores.ambar
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.10f))
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                modo.titulo.uppercase(),
+                fontSize = 10.sp, letterSpacing = 1.5.sp, color = color, fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                if (modo == Modo.SEGURO)
+                    "Sólo modelo y gráficos · deshace solo si algo no cuadra"
+                else
+                    "Añade kernel, API y build · cada escritura se anota antes de hacerla",
+                fontSize = 11.sp, color = Colores.textoSuave, lineHeight = 15.sp,
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Box(
+            Modifier.clip(RoundedCornerShape(8.dp)).background(color).clickable { onModo() }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Text(
+                if (modo == Modo.SEGURO) "Pasar a experto" else "Volver a seguro",
+                fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                color = if (modo == Modo.SEGURO) Colores.fondo else Colores.fondo,
+            )
+        }
+    }
+}
+
+@Composable
+private fun TarjetaSuper(s: Supercomputadora, activa: Boolean, onSimular: () -> Unit) {
+    val borde = if (activa) Colores.rojo else Colores.borde
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(if (activa) Colores.superficieAlta else Colores.superficie)
+            .border(if (activa) 1.5.dp else 1.dp, borde, RoundedCornerShape(12.dp))
+            .clickable { onSimular() }.padding(14.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text("#${s.rank}  ${s.nombre}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                    color = Colores.texto)
+                Spacer(Modifier.height(2.dp))
+                Text("${s.sitio} · ${s.pais}", fontSize = 12.sp, color = Colores.textoSuave)
+            }
+            Text("SIMULACIÓN", fontSize = 8.sp, letterSpacing = 1.sp, color = Colores.rojo,
+                fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("${"%,d".format(s.nucleos)} núcleos", fontSize = 11.sp, color = Colores.ambar,
+                fontFamily = FontFamily.Monospace)
+            Text("%.2f PFlop/s".format(s.rmaxPFlops), fontSize = 11.sp, color = Colores.ambar,
+                fontFamily = FontFamily.Monospace)
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(s.nota, fontSize = 11.sp, lineHeight = 15.sp, color = Colores.textoSuave.copy(alpha = 0.85f))
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "→ el teléfono declarará llamarse «${s.nombre}»",
+            fontSize = 11.sp, color = Colores.textoSuave, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
         )
     }
 }
