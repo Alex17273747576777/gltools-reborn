@@ -18,6 +18,7 @@ class Director(context: Context) {
 
     private val app = context.applicationContext
     private val registro = Registro(app)
+    private val aplicado = Aplicado(app)
 
     private var ejecutor: Ejecutor? = null
 
@@ -25,10 +26,11 @@ class Director(context: Context) {
     private val shell = Shell()
     fun shell(): Shell = shell
     fun hayShell(): Boolean = shell.disponible()
-    fun apps(): GestorApps = GestorApps(shell, registro)
-    fun sistema(): Sistema = Sistema(shell)
+    fun apps(): GestorApps = GestorApps(shell, registro, aplicado)
+    fun sistema(): Sistema = Sistema(shell, aplicado)
     fun pantalla(): AjustesPantalla = AjustesPantalla(shell)
     fun compatibilidad(): Compatibilidad = Compatibilidad(shell)
+    fun aplicado(): Aplicado = aplicado
     private var estado: Estado = Estado.SIN_VIA
     private var original: Map<String, String> = emptyMap()
 

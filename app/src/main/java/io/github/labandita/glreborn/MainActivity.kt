@@ -4,7 +4,22 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import io.github.labandita.glreborn.ui.Cristal
+import io.github.labandita.glreborn.ui.PanelApp
+import androidx.compose.ui.text.font.FontWeight
 import io.github.labandita.glreborn.core.*
 import io.github.labandita.glreborn.ui.PantallaPrincipal
 import io.github.labandita.glreborn.ui.TemaReborn
@@ -52,6 +67,7 @@ class MainActivity : ComponentActivity() {
     companion object { const val REQUEST_SHIZUKU = 4201 }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun App(
     director: Director,
@@ -74,6 +90,9 @@ private fun App(
     var datosEquipo by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var pruebasCompat by remember { mutableStateOf<List<Compatibilidad.Prueba>>(emptyList()) }
     var resumenCompat by remember { mutableStateOf("") }
+    var fichas by remember { mutableStateOf<List<Ficha>>(emptyList()) }
+    var panelDe by remember { mutableStateOf<String?>(null) }
+    var appPanel by remember { mutableStateOf<Inventario.App?>(null) }
 
     fun releer() {
         onRefrescar()
@@ -88,11 +107,50 @@ private fun App(
         datosEquipo = director.compatibilidad().datosBasicos()
         pruebasCompat = director.compatibilidad().ejecutar()
         resumenCompat = director.compatibilidad().resumen(pruebasCompat)
+        fichas = director.aplicado().fichas(apps.associate { it.paquete to it.nombre })
         limites = diagnostico.limites()
         if (estado == Director.Estado.SHIZUKU_SIN_PERMISO) onPedirShizuku()
     }
 
     LaunchedEffect(Unit) { releer() }
+
+    // El panel de cada app: hoja de cristal a pantalla completa.
+    panelDe?.let { paquete ->
+        val contexto = LocalContext.current
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { panelDe = null },
+            sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = Cristal.fondoMedio,
+            dragHandle = null,
+        ) {
+            androidx.compose.foundation.layout.Column(
+                androidx.compose.ui.Modifier
+                    .fillMaxHeight(0.94f)
+                    .padding(top = 8.dp)
+            ) {
+                Row(
+                    androidx.compose.ui.Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Panel de la app", fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                        color = Cristal.texto)
+                    Text(
+                        "Cerrar",
+                        fontSize = 13.sp, color = Cristal.violeta, fontWeight = FontWeight.Medium,
+                        modifier = androidx.compose.ui.Modifier.clickable { panelDe = null },
+                    )
+                }
+                PanelApp(
+                    context = contexto,
+                    ficha = director.aplicado().de(paquete),
+                    app = appPanel,
+                    telefono = actual,
+                    modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                )
+            }
+        }
+    }
 
     PantallaPrincipal(
         director = director,
@@ -155,6 +213,11 @@ private fun App(
         onProbarCompatibilidad = {
             pruebasCompat = director.compatibilidad().ejecutar()
             resumenCompat = director.compatibilidad().resumen(pruebasCompat)
+        },
+        fichas = fichas,
+        onPanel = { paquete ->
+            appPanel = apps.firstOrNull { it.paquete == paquete }
+            panelDe = paquete
         },
         onPerfil = { perfil = it },
         onAplicar = {

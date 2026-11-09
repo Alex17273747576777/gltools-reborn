@@ -11,7 +11,7 @@ import io.github.labandita.glreborn.shizuku.Shell
  * Ideas de: Cache Cleaner (magiskmodule.com/cache-cleaner), Benimaru Tool
  * (DNS privado) y los tweaks de animación habituales.
  */
-class Sistema(private val shell: Shell) {
+class Sistema(private val shell: Shell, private val aplicado: Aplicado? = null) {
 
     /** Tamaño de la caché de una app, en bytes. -1 si no se pudo leer. */
     fun tamanoCache(paquete: String): Long {
@@ -32,6 +32,12 @@ class Sistema(private val shell: Shell) {
         val antes = tamanoCache(paquete)
         val r = shell.correr("rm -rf /data/data/$paquete/cache/* 2>/dev/null; true")
         val despues = tamanoCache(paquete)
+        if (despues >= 0 && (antes < 0 || despues < antes)) aplicado?.anotar(
+            paquete, "Caché borrada",
+            "Se borraron ${legible(if (antes > 0) antes - despues else 0)} de caché. " +
+                "No se pierde nada: la caché se regenera sola.",
+            reversible = true,
+        )
         return Resultado(
             ok = despues >= 0 && (antes < 0 || despues < antes),
             via = Via.SHIZUKU,

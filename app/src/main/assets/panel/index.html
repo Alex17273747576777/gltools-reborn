@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Panel · GLTools Reborn</title>
+<style>
+/* Liquid Glass, el mismo lenguaje que la app. Sin fuentes externas, sin CDN:
+   todo va dentro del APK y funciona en modo avión. */
+:root{
+  --violeta:#9D7BFF; --cian:#5CE1E6; --rosa:#FF7AB6;
+  --verde:#4ADE80; --ambar:#FFC24B; --rojo:#FF6B81;
+  --texto:#F4F1FF; --suave:#B5AECF;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  color:var(--texto);
+  background:
+    radial-gradient(1000px 600px at 15% -10%, rgba(157,123,255,.35), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(92,225,230,.22), transparent 55%),
+    linear-gradient(180deg,#12081F 0%,#1B1030 55%,#0A0612 100%);
+  background-attachment:fixed;
+  padding:22px 18px calc(96px + env(safe-area-inset-bottom));
+  min-height:100vh;
+}
+/* Cristal: translúcido + borde de luz + desenfoque de lo que hay detrás */
+.vidrio{
+  background:rgba(255,255,255,.10);
+  border:1px solid rgba(255,255,255,.20);
+  border-radius:22px;
+  backdrop-filter:blur(22px) saturate(160%);
+  -webkit-backdrop-filter:blur(22px) saturate(160%);
+  box-shadow:0 10px 34px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.22);
+}
+header{display:flex;align-items:center;gap:14px;margin-bottom:20px}
+.icono{
+  width:58px;height:58px;border-radius:16px;flex:0 0 auto;
+  display:grid;place-items:center;font-size:25px;font-weight:700;
+  background:linear-gradient(140deg,var(--violeta),var(--cian));
+  color:#12081F;box-shadow:0 8px 24px rgba(157,123,255,.45);
+}
+h1{font-size:21px;margin:0 0 3px;font-weight:700;letter-spacing:-.4px;line-height:1.2}
+.pkg{font-size:11px;color:var(--suave);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all}
+h2{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--suave);margin:26px 4px 12px;font-weight:700}
+.tarjeta{padding:16px;margin-bottom:12px}
+.fila{display:flex;justify-content:space-between;gap:12px;padding:7px 0;font-size:13px}
+.fila + .fila{border-top:1px solid rgba(255,255,255,.07)}
+.k{color:var(--suave)}
+.v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;text-align:right;word-break:break-all}
+.hecho{display:flex;gap:12px;padding:12px 0}
+.hecho + .hecho{border-top:1px solid rgba(255,255,255,.07)}
+.hecho:first-child{padding-top:2px}
+.hecho:last-child{padding-bottom:2px}
+.punto{width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-top:5px}
+.ok{background:var(--verde);box-shadow:0 0 12px rgba(74,222,128,.6)}
+.aviso{background:var(--ambar);box-shadow:0 0 12px rgba(255,194,75,.6)}
+.mal{background:var(--rojo);box-shadow:0 0 12px rgba(255,107,129,.6)}
+.accion{font-size:13.5px;font-weight:600;margin-bottom:3px}
+.det{font-size:11.5px;color:var(--suave);line-height:1.45}
+.cuando{font-size:10.5px;color:#7E769B;margin-top:4px;font-variant-numeric:tabular-nums}
+.vacio{text-align:center;padding:34px 18px;color:var(--suave);font-size:13px;line-height:1.6}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;
+  letter-spacing:.7px;text-transform:uppercase;padding:5px 11px;border-radius:999px;
+  background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);
+}
+.chip.verde{color:var(--verde);border-color:rgba(74,222,128,.4)}
+.chip.ambar{color:var(--ambar);border-color:rgba(255,194,75,.4)}
+.chip.rojo{color:var(--rojo);border-color:rgba(255,107,129,.4)}
+.barra{
+  position:fixed;left:50%;transform:translateX(-50%);
+  bottom:calc(18px + env(safe-area-inset-bottom));
+  display:flex;gap:6px;padding:7px;border-radius:999px;
+  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.24);
+  backdrop-filter:blur(26px) saturate(180%);
+  -webkit-backdrop-filter:blur(26px) saturate(180%);
+  box-shadow:0 12px 40px rgba(0,0,0,.5);
+}
+.barra button{
+  border:0;background:transparent;color:var(--suave);font:inherit;font-size:12px;
+  font-weight:600;padding:9px 16px;border-radius:999px;transition:all .25s cubic-bezier(.34,1.56,.64,1);
+}
+.barra button.act{background:linear-gradient(140deg,var(--violeta),var(--cian));color:#12081F}
+.nota{font-size:11px;color:#7E769B;line-height:1.6;margin:10px 4px 0}
+.pill{display:inline-block;font-size:10px;padding:3px 9px;border-radius:999px;background:rgba(255,107,129,.16);color:var(--rojo);border:1px solid rgba(255,107,129,.35);margin-left:8px;vertical-align:middle}
+@keyframes subir{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.tarjeta,.hecho{animation:subir .45s cubic-bezier(.34,1.4,.64,1) both}
+</style>
+</head>
+<body>
+<header>
+  <div class="icono" id="icono">G</div>
+  <div style="min-width:0">
+    <h1 id="nombre">—</h1>
+    <div class="pkg" id="paquete">—</div>
+  </div>
+</header>
+
+<div id="estado"></div>
+
+<h2 id="t-hechos">Lo que se aplicó</h2>
+<div class="vidrio tarjeta" id="hechos"></div>
+
+<h2 id="t-telefono">El teléfono ahora</h2>
+<div class="vidrio tarjeta" id="telefono"></div>
+
+<h2 id="t-permisos">Permisos de esta app</h2>
+<div class="vidrio tarjeta" id="permisos"></div>
+
+<p class="nota">
+  Este panel se genera en tu teléfono, con lo que la app tiene anotado. No hay servidor,
+  no hay cuenta y no sale nada a internet: por eso GLTools Reborn no pide permiso de red.
+</p>
+
+<div class="barra">
+  <button class="act" onclick="ver('t-hechos',this)">Aplicado</button>
+  <button onclick="ver('t-telefono',this)">Sistema</button>
+  <button onclick="ver('t-permisos',this)">Permisos</button>
+</div>
+
+<script>
+// Los datos llegan inyectados por la app. Si algo falta, se dice; no se inventa.
+const D = window.DATOS || {};
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fecha(ms){
+  if(!ms) return '';
+  const d=new Date(ms), hoy=new Date();
+  const hh=String(d.getHours()).padStart(2,'0'), mm=String(d.getMinutes()).padStart(2,'0');
+  const mismoDia=d.toDateString()===hoy.toDateString();
+  return mismoDia? `hoy ${hh}:${mm}` : `${d.getDate()}/${d.getMonth()+1} ${hh}:${mm}`;
+}
+
+document.getElementById('nombre').textContent = D.nombre || 'App';
+document.getElementById('paquete').textContent = D.paquete || '';
+document.getElementById('icono').textContent = (D.nombre || 'G').trim().charAt(0).toUpperCase() || 'G';
+
+// Estado arriba: un chip que dice la verdad.
+const hechos = Array.isArray(D.hechos) ? D.hechos : [];
+let chip = '<span class="chip">Sin cambios registrados</span>';
+if(hechos.length){
+  const irrev = hechos.some(h=>!h.reversible);
+  chip = `<span class="chip ${irrev?'ambar':'verde'}">${hechos.length} acción${hechos.length===1?'':'es'}${irrev?' · incluye irreversible':''}</span>`;
+}
+document.getElementById('estado').innerHTML = chip;
+
+// Lista de hechos
+const cajaHechos = document.getElementById('hechos');
+if(!hechos.length){
+  cajaHechos.innerHTML = '<div class="vacio">Todavía no se le aplicó nada a esta app.<br>Cuando congeles, detengas o le limpies la caché, aparecerá aquí.</div>';
+}else{
+  cajaHechos.innerHTML = hechos.map(h=>{
+    const cls = h.reversible ? 'ok' : 'mal';
+    return `<div class="hecho">
+      <div class="punto ${cls}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="accion">${esc(h.accion)}${h.reversible?'':'<span class="pill">sin vuelta atrás</span>'}</div>
+        <div class="det">${esc(h.detalle)}</div>
+        <div class="cuando">${fecha(h.cuando)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Estado del sistema
+const t = D.telefono || {};
+const filas = Object.keys(t);
+document.getElementById('telefono').innerHTML = filas.length
+  ? filas.map(k=>`<div class="fila"><span class="k">${esc(k)}</span><span class="v">${esc(t[k])||'—'}</span></div>`).join('')
+  : '<div class="vacio">Sin lectura del sistema.<br>Hace falta Shizuku activo para leer las propiedades del teléfono.</div>';
+
+// Permisos que la app pide de verdad (los manda la app desde el APK).
+const permisos = Array.isArray(D.permisos) ? D.permisos : [];
+document.getElementById('permisos').innerHTML = permisos.length
+  ? permisos.map(p=>`<div class="fila"><span class="k">${esc(p.nombre)}</span>
+      <span class="v">${esc(p.para)}</span></div>`).join('') +
+    '<div class="nota" style="margin:12px 0 0">Estos permisos los declara el APK. ' +
+    'No hay INTERNET, ni ubicación, ni cámara, ni contactos, ni almacenamiento.</div>'
+  : '<div class="vacio">Sin permisos declarados.</div>';
+
+function ver(id, btn){
+  document.querySelectorAll('.barra button').forEach(b=>b.classList.remove('act'));
+  btn.classList.add('act');
+  const destino = document.getElementById(id);
+  if(destino) destino.scrollIntoView({behavior:'smooth',block:'start'});
+}
+</script>
+</body>
+</html>

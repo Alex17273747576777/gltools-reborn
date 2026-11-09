@@ -85,3 +85,43 @@ inventado.
 Esa última línea es la más importante del documento: ninguna app puede prometer que
 cambiar `ro.product.model` va a funcionar en todos los teléfonos, y la que lo prometa
 está vendiendo algo que no controla.
+
+---
+
+# 1.4.0 — paneles por app, Liquid Glass y permisos
+
+Fecha: 8 de noviembre de 2026. Lo que sigue son **mediciones sobre el APK de 1.4.0**,
+no impresiones.
+
+## Lo que sí está probado
+
+| Comprobación | Resultado |
+|---|---|
+| `./gradlew :app:pruebasNucleo` | **87 comprobaciones**, todas pasan (8 nuevas del cuaderno) |
+| `:app:lintDebug` | **0 errores**, 8 avisos (4 `GradleDependency`, `OldTargetApi`, `ModifierParameter`, `DataExtractionRules`, `ObsoleteSdkInt`) |
+| `:app:assembleRelease` | APK firmado, **1.031.921 B** |
+| `apksigner verify --print-certs` | OK · SHA-256 `1ff4c6ee…c9e803` (**la misma clave que 1.2.0 y 1.3.0**: actualiza encima) |
+| `aapt2 dump badging` | `versionCode 5`, `1.4.0`, minSdk 26, target 35 |
+| `aapt2 dump permissions` | **3 permisos**, los mismos que 1.3.0. Sigue **sin INTERNET** |
+| `assets/panel/index.html` dentro del APK | sí, **8.893 B** |
+| Panel funcionando en el APK | `WebViewAssetLoader` sustituido por R8 por `e1/a` y `e1/b`, y **`AssetManager.open` presente** en el DEX |
+| Historial de lo aplicado | cadena `aplicado.json` presente en el DEX |
+
+## Lo que NO está probado, y por qué
+
+- **No se ha instalado ni arrancado en un teléfono.** Esta máquina no tiene `/dev/kvm`:
+  no hay emulador y no puedo decir «probado en el dispositivo» sin mentir.
+- El panel se ha verificado **compilado y empaquetado**, no pintado en pantalla. Lo que sí
+  se comprueba en el teléfono del usuario, en cuanto abra una app: si el `WebView` no
+  cargara, se vería el texto de respaldo de `PanelAssets` (fondo oscuro con un mensaje).
+
+## Cómo comprobarlo tú en dos minutos
+
+```bash
+aapt2 dump permissions GLToolsReborn-1.4.0-release.apk   # 3 líneas, sin INTERNET
+unzip -p GLToolsReborn-1.4.0-release.apk assets/panel/index.html | head -5
+sha256sum GLToolsReborn-1.4.0-release.apk
+```
+
+Y en la app: **Útil → cualquier app → Panel**. Si es la primera vez, dirá «Todavía no se le
+aplicó nada a esta app»; congela algo y vuelve a abrir el panel.

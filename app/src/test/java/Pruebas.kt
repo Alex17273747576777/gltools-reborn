@@ -250,8 +250,42 @@ fun main() {
         resumenCp.contains("no funcionarán"), resumenCp)
     check("no dice «compatible» a secas", !resumenCp.equals("compatible", true), resumenCp)
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Cuaderno de lo aplicado (reglas puras: el fichero necesita Android)
+// ─────────────────────────────────────────────────────────────────────────────
+run {
+    println("\nCuaderno de lo aplicado")
+    fun h(ms: Long, rev: Boolean = true) = Hecho(ms, "accion$ms", "detalle", rev)
+
+    check("ordenar deja lo más reciente primero",
+        ReglasAplicado.ordenar(listOf(h(1_000), h(3_000), h(2_000))).map { it.cuando } ==
+            listOf(3_000L, 2_000L, 1_000L))
+
+    val cuarenta = (1L..40L).map { h(it * 1_000) }
+    check("con 40 hechos no se recorta nada",
+        ReglasAplicado.recortar(cuarenta).size == 40)
+
+    val cuarentaYUno = (1L..41L).map { h(it * 1_000) }
+    val recortado = ReglasAplicado.recortar(cuarentaYUno)
+    check("con 41 se queda en 40", recortado.size == 40)
+    check("y tira el más viejo, no el más nuevo",
+        recortado.first().cuando == 2_000L && recortado.last().cuando == 41_000L)
+
+    check("una lista mixta con algo irreversible se detecta",
+        ReglasAplicado.tieneIrreversible(listOf(h(1, true), h(2, false))))
+    check("una lista toda reversible no se marca",
+        !ReglasAplicado.tieneIrreversible(listOf(h(1, true), h(2, true))))
+    check("lista vacía no se marca", !ReglasAplicado.tieneIrreversible(emptyList()))
+
+    val ficha = Ficha("com.x", "X", listOf(h(5_000), h(9_000)))
+    check("la ficha sabe cuál fue el último hecho", ficha.ultimo == 9_000L)
+
+    println("\n  Sin probar aquí: el ida y vuelta del JSON en disco (necesita Android).")
+}
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")
     kotlin.system.exitProcess(if (fallos == 0) 0 else 1)
 }
+

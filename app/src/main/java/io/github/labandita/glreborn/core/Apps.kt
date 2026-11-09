@@ -15,6 +15,7 @@ import io.github.labandita.glreborn.shizuku.Shell
 class GestorApps(
     private val shell: Shell,
     private val registro: Registro?,
+    private val aplicado: Aplicado? = null,
 ) {
 
     /** Paquetes que NO se tocan nunca: si se congelan, el teléfono deja de responder. */
@@ -48,6 +49,12 @@ class GestorApps(
         }
         registro?.apuntar("app:$paquete", "activa", "congelada", Modo.SEGURO)
         val confirmado = estaCongelada(paquete)
+        if (confirmado) aplicado?.anotar(
+            paquete, "Congelada",
+            "Se deshabilitó con pm disable-user. Deja de gastar batería y no aparece " +
+                "en el cajón de apps. Se puede volver a activar desde aquí.",
+            reversible = true,
+        )
         return Resultado(
             ok = confirmado,
             via = Via.SHIZUKU,
@@ -60,6 +67,11 @@ class GestorApps(
         if (!shell.disponible()) return Resultado(false, Via.NINGUNA, "Shizuku no está activo.")
         val r = shell.correr("pm enable $paquete")
         val ok = r?.ok == true && !estaCongelada(paquete)
+        if (ok) aplicado?.anotar(
+            paquete, "Activada",
+            "Se volvió a habilitar con pm enable. Vuelve a funcionar con normalidad.",
+            reversible = true,
+        )
         return Resultado(ok, Via.SHIZUKU,
             if (ok) "$paquete activa de nuevo." else "No se pudo activar: ${r?.texto ?: "sin respuesta"}")
     }
@@ -68,6 +80,12 @@ class GestorApps(
     fun detener(paquete: String): Resultado {
         revisar(paquete)?.let { return Resultado(false, Via.SHIZUKU, it) }
         val r = shell.correr("am force-stop $paquete")
+        if (r?.ok == true) aplicado?.anotar(
+            paquete, "Detenida",
+            "Se cerró con am force-stop. Se puede volver a abrir cuando quieras; " +
+                "no queda deshabilitada.",
+            reversible = true,
+        )
         return Resultado(r?.ok == true, Via.SHIZUKU,
             if (r?.ok == true) "$paquete detenida." else "No se pudo detener.")
     }
@@ -96,6 +114,12 @@ class GestorApps(
         revisar(paquete)?.let { return Resultado(false, Via.SHIZUKU, it) }
         if (!confirmado) return Resultado(false, Via.SHIZUKU, "Falta la confirmación: esto no se deshace.")
         val r = shell.correr("pm uninstall --user 0 $paquete")
+        if (r?.ok == true) aplicado?.anotar(
+            paquete, "Desinstalada",
+            "Se desinstaló para este usuario con pm uninstall --user 0. " +
+                "Los datos de la app se pierden. Desde aquí NO se puede deshacer.",
+            reversible = false,
+        )
         return Resultado(r?.ok == true, Via.SHIZUKU,
             if (r?.ok == true) "$paquete desinstalada para este usuario. No se puede deshacer desde aquí."
             else "No se pudo desinstalar: ${r?.texto ?: "sin respuesta"}")

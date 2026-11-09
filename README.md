@@ -61,6 +61,39 @@ eso puede funcionar en Huawei sin GMS). Verificado con Lint `NewApi` = 0, y con 
 pestaña **Compat.**, que prueba en tu propio teléfono cada función y te dice cuáles
 responden de verdad. Detalle: [COMPATIBILIDAD-ANDROID.md](COMPATIBILIDAD-ANDROID.md).
 
+## Paneles por app (1.4.0)
+
+Cada app tiene **su propio panel**, en pestaña nueva **Aplicado** o con el botón *Panel* de
+cada tarjeta. Dice qué se le aplicó a **esa** app, cuándo, y qué significa:
+
+- Congelada → deja de gastar batería y desaparece del cajón de apps.
+- Activada · Detenida · Caché borrada · Desinstalada.
+- Lo que **no** tiene vuelta atrás se marca en rojo, dentro del panel y en la lista.
+
+El panel se sirve en un `WebView` desde los assets del APK con `WebViewAssetLoader`
+(`https://appassets.androidplatform.net`). **No hay servidor, ni petición de red**: por eso
+la app sigue sin permiso de INTERNET y el panel funciona en modo avión. El historial vive
+en `filesDir/aplicado.json`, se queda en el teléfono y guarda como mucho **40 hechos por
+app** (es un historial legible, no un registro de auditoría).
+
+Javascript está encendido porque el panel lo necesita para pintar. Lo que está apagado:
+`allowFileAccess`, `allowContentAccess` y `domStorage`.
+
+## Permisos, uno por uno
+
+Son **tres**, y ninguno es mío de verdad. Tabla completa con motivo y origen en
+[PERMISOS.md](PERMISOS.md). Resumen:
+
+| Permiso | Quién lo declara | Para qué |
+|---|---|---|
+| `moe.shizuku.manager.permission.API_V23` | Shizuku / OmniShizuku | ejecutar la shell |
+| `android.permission.QUERY_ALL_PACKAGES` | el sistema | ver todas las apps instaladas |
+| `…DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | la añade AndroidX sola | proteger sus receptores internos |
+
+**No hay INTERNET, ni ubicación, ni cámara, ni contactos, ni almacenamiento, ni teléfono,
+ni SMS.** La ausencia de INTERNET no es un descuido: es la razón de que la app pueda
+funcionar en modo avión y de que no haya nada que enviar a ningún sitio.
+
 ## Utilidades (1.2.0)
 
 Sección **Útil**, todo a través de la shell de Shizuku — los mismos permisos que un
@@ -76,7 +109,7 @@ Sección **Útil**, todo a través de la shell de Shizuku — los mismos permiso
 
 De dónde salió cada idea y qué se descartó a propósito: [FUNCIONES.md](FUNCIONES.md).
 
-## Las seis pantallas
+## Las ocho pantallas
 
 - **Perfiles** — el estado real del teléfono arriba, el catálogo con su nivel de confianza,
   y *Aplicar* / *Restaurar*. Cada card dice si está VERIFICADO o PARCIAL y **qué falta**.
@@ -87,14 +120,31 @@ De dónde salió cada idea y qué se descartó a propósito: [FUNCIONES.md](FUNC
 - **Super** — diez fichas del TOP500, con los datos de la lista vigente. **Son simulación**:
   el teléfono *declara* llamarse LineShine; no tiene sus 13.789.440 núcleos. Va aquí y no
   en Perfiles para que nunca se confunda con un perfil de dispositivo.
+- **Útil** — resolución con reversión automática, refresco, congelar apps, borrar caché,
+  DNS privado y escala de animación. Cada tarjeta tiene su botón **Panel**.
+- **Aplicado** — una ficha por app con lo que se le hizo, y su panel en cristal.
+- **Compat.** — nueve pruebas reales en tu teléfono (`wm size`, `pm list packages`,
+  DNS privado, `getprop`, `setprop`…) y el resumen de qué responde y qué no.
 - **Diagnóstico** — cada afirmación con su estado, las listas del filtro completas, y una
   lista explícita de lo que esta app **no** puede hacer. A la vista, no en un pie.
+
+## El aspecto
+
+Interfaz **Liquid Glass**: superficies translúcidas con degradados radiales, bordes de luz
+arriba y abajo, y la navegación en una **píldora flotante** sobre el contenido en vez de
+una fila de botones pegada al borde. La referencia es el iOS de las apps de anime/manga
+(ReDantotsu, Kiroku) — blur, píldora abajo, animaciones de muelle. No es una copia de
+ninguna de ellas ni de la ficha de un módulo: la paleta (violeta, cian, rosa) y todo el
+código son de aquí.
+
+El blur es de Compose (`Modifier.vidrio()`), no captura de pantalla: no cuesta batería
+extra y no depende de la versión de Android.
 
 ## Compilar
 
 ```bash
 ./gradlew :app:assembleDebug          # APK de depuración
-./gradlew :app:pruebasNucleo          # 70 pruebas del núcleo, sin emulador
+./gradlew :app:pruebasNucleo          # 87 comprobaciones del núcleo, sin emulador
 ```
 
 Para firmar el release hacen falta variables de entorno; **no hay ninguna clave en el
