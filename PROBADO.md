@@ -8,15 +8,19 @@ build-tools 35.0.0.
 | Qué | Cómo | Resultado |
 |---|---|---|
 | Compila | `gradle :app:assembleDebug` | OK |
-| Compila release y firma | `gradle :app:assembleRelease` con clave propia | OK, APK de 894 KB |
-| Firma verificada | `apksigner verify --print-certs` | SHA-256 `BA:ED:D4:74…7F:FC:CA` |
+| Compila release y firma | `./gradlew :app:assembleRelease` con clave propia | OK, APK de **910.711 bytes** |
+| Firma verificada | `apksigner verify --print-certs` | SHA-256 `baedd474…4647ffcca` |
+| La firma sale del entorno, no del archivo | compilar sin las variables `REBORN_*` | produce `app-release-unsigned.apk`: **no se firma sola** |
 | **Cero permiso de INTERNET** | `aapt2 dump permissions` sobre el APK | 0 coincidencias |
-| Núcleo: catálogo | `gradle :app:pruebasNucleo` | **20 comprobaciones, todas pasan** (contadas en el fuente: `grep -c 'check("'` → 20) |
+| Núcleo: catálogo | `gradle :app:pruebasNucleo` | **26 comprobaciones, todas pasan** (contadas en el fuente: `grep -c 'check("' ` → 26) |
 | Núcleo: escritura | idem, con ejecutor falso | escribe, omite vacíos, confirma |
 | Núcleo: bloqueo del fabricante | idem | **no declara éxito si no cambió** |
 | Núcleo: sin vía | idem | no aplica nada y lo dice |
 | Núcleo: restaurar | idem | vuelve al valor original |
 | La suite no da verde regalado | sabotear `ok = true` a propósito | la prueba falla; restaurado, verde |
+| La regla del GPU es cierta | comprobar que todo `openglEs` es numérico | todos numéricos |
+| El censo cuadra | verificados + parciales = total | cuadra |
+| Compila con el wrapper | `./gradlew assembleRelease` | OK, misma huella |
 
 ## NO probado, y por qué
 

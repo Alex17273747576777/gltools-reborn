@@ -31,6 +31,36 @@ ese estado la app se abre, lee lo que puede, y muestra **SIN VÍA** en rojo arri
 botones de aplicar existen pero responden «No se aplicó nada». Una app que dijera
 «aplicado» ahí estaría mintiendo.
 
+## Las cuatro pantallas
+
+- **Perfiles** — el estado real del teléfono arriba, el catálogo con su nivel de confianza,
+  y *Aplicar* / *Restaurar*. Cada card dice si está VERIFICADO o PARCIAL y **qué falta**.
+- **Apps** — todo lo instalado, contado y sin filtro. Está aquí para que compruebes tú
+  mismo que no hay lista blanca: si tu app no aparece, es que no está instalada.
+- **GPU** — lo que declara el teléfono y la regla del formato: `196610` es OpenGL ES 3.2.
+  Poner el texto «OpenGL ES 3.2» en esa propiedad no la cambia, la rompe.
+- **Diagnóstico** — cada afirmación con su estado, y una lista explícita de lo que esta
+  app **no** puede hacer. Esa lista está a la vista, no en un pie de página.
+
+## Compilar
+
+```bash
+./gradlew :app:assembleDebug          # APK de depuración
+./gradlew :app:pruebasNucleo          # 26 pruebas del núcleo, sin emulador
+```
+
+Para firmar el release hacen falta variables de entorno; **no hay ninguna clave en el
+repositorio**:
+
+```bash
+export REBORN_KEYSTORE=/ruta/reborn-release.jks
+export REBORN_STORE_PASS=...  REBORN_KEY_PASS=...  REBORN_KEY_ALIAS=reborn
+./gradlew :app:assembleRelease
+```
+
+Sin esas variables el resultado es `app-release-unsigned.apk`. Eso es a propósito: una
+llave que se firma sola es una llave que cualquiera puede usar.
+
 ## Sin límite de apps
 
 No hay lista blanca ni cuota. Un perfil se aplica al sistema entero: afecta a todas las

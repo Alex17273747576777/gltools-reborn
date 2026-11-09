@@ -100,6 +100,25 @@ fun main() {
     Escritor(e3).restaurar(orig)
     check("volvió al original", props3["ro.product.model"] == "Original", props3["ro.product.model"].toString())
 
+    println("\n7 · La regla que la interfaz afirma en la sección GPU")
+    // La pantalla dice: «se declara con un número entero, no con un texto». Eso tiene
+    // que ser cierto en TODOS los perfiles o la app se contradice a sí misma.
+    val noNumericos = todos.filter { it.openglEs.isNotBlank() && it.openglEs.toIntOrNull() == null }
+    check("todos los openglEs son numéricos", noNumericos.isEmpty(),
+        noNumericos.map { "${it.nombre}=${it.openglEs}" }.toString())
+    check("196610 es el valor de OpenGL ES 3.2 en los tope de gama",
+        todos.filter { it.openglEs == "196610" }.size >= 3,
+        "con 196610: ${todos.count { it.openglEs == "196610" }}")
+
+    println("\n8 · El censo que enseña la interfaz cuadra con el catálogo")
+    val censo = Perfiles.censo()
+    val v = todos.count { it.confianza == PerfilDispositivo.Confianza.VERIFICADO }
+    val p2c = todos.count { it.confianza == PerfilDispositivo.Confianza.PARCIAL }
+    check("el censo menciona los verificados", censo.contains(v.toString()), censo)
+    check("verificados + parciales = total", v + p2c == todos.size, "$v + $p2c vs ${todos.size}")
+    check("no hay ids repetidos", todos.map { it.id }.distinct().size == todos.size)
+    check("porId encuentra a todos", todos.all { Perfiles.porId(it.id)?.id == it.id })
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")
