@@ -10,6 +10,7 @@ build-tools 35.0.0.
 | Compila | `gradle :app:assembleDebug` | OK |
 | Compila release y firma | `./gradlew :app:assembleRelease` con clave propia | OK, APK de **927.095 bytes** |
 | Firma verificada | `apksigner verify --print-certs` | SHA-256 `baedd474…4647ffcca` |
+| La clave de firma se perdió | comprobar huella de la clave actual | `1ff4c6ee…c6c9e803` — **distinta**. Ver `CLAVE.md` |
 | La firma sale del entorno, no del archivo | compilar sin las variables `REBORN_*` | produce `app-release-unsigned.apk`: **no se firma sola** |
 | **Cero permiso de INTERNET** | `aapt2 dump permissions` sobre el APK | 0 coincidencias |
 | Núcleo: catálogo | `gradle :app:pruebasNucleo` | **51 comprobaciones, todas pasan** (contadas: `grep -c 'check("' ` → 51) |
