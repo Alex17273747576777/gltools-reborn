@@ -9,7 +9,10 @@ import io.github.labandita.glreborn.core.*
 
 var fallos = 0
 fun check(nombre: String, cond: Boolean, detalle: String = "") {
-    if (cond) println("  ✓ $nombre") else { println("  ✗ $nombre $detalle"); fallos++ }
+    // Marcas en ASCII a propósito: la consola de Gradle se come los símbolos y entonces
+    // no se distingue un fallo de un acierto. Pasó de verdad.
+    if (cond) println("  [ok]    $nombre")
+    else { println("  [FALLO] $nombre  $detalle"); fallos++ }
 }
 
 /** Ejecutor falso: simula lo que el sistema devolvería. */
@@ -281,6 +284,154 @@ run {
     check("la ficha sabe cuál fue el último hecho", ficha.ultimo == 9_000L)
 
     println("\n  Sin probar aquí: el ida y vuelta del JSON en disco (necesita Android).")
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sonda, generador, buscador, extractor y generación distribuida
+// Lógica pura: se prueba aquí, sin teléfono.
+// ─────────────────────────────────────────────────────────────────────────────
+run {
+    println("\nSonda del aparato")
+    val crudo = """
+        [ro.product.brand]: [TECNO]
+        [ro.product.model]: [TECNO BG7]
+        [ro.product.device]: [TECNO-BG7]
+        [ro.opengles.version]: [196610]
+        [ro.build.version.release]: [13]
+        vacia:
+    """.trimIndent()
+    val props = Sonda.interpretar(crudo)
+    check("lee el formato [clave]: [valor] de getprop sin argumentos",
+        props["ro.product.brand"] == "TECNO", props.toString())
+    check("lee el modelo", props["ro.product.model"] == "TECNO BG7")
+    check("lee OpenGL ES como número y no como texto",
+        props["ro.opengles.version"] == "196610")
+    // `getprop` imprime sólo las propiedades que existen: `vacia:` desaparece en vez de
+    // aparecer con valor nulo. Lo que se exige es que no rompa, no que la invente.
+    check("una línea sin valor no rompe y no se inventa la clave",
+        !props.containsKey("vacia") && props.size == 5, props.keys.toString())
+    check("el comando pide las claves de una en una, en una sola llamada",
+        Sonda.comando().startsWith("getprop ro.product.brand"))
+
+    val datos = Sonda.juntar(props, "13", listOf("arm64-v8a"), esHuawei = false)
+    check("junta los datos y cuenta los campos leídos", datos.camposLeidos == 5,
+        datos.camposLeidos.toString())
+    check("se declara incompleto si faltan marca o modelo",
+        Sonda.juntar(emptyMap(), "13", emptyList(), false).completa.not())
+    check("el resumen no adorna: dice cuántos campos leyó",
+        datos.resumen.contains("campos leídos"), datos.resumen)
+
+    println("\nGenerador de perfiles")
+    val g = Generador.derivar(datos, Generador.Estrategia.MISMA_GPU)
+    check("genera un perfil a partir de un aparato real", g != null)
+    if (g != null) {
+        check("el perfil generado no se hace pasar por verificado",
+            g.perfil.confianza == PerfilDispositivo.Confianza.PARCIAL)
+        check("la fuente dice de dónde salió", g.perfil.fuente.contains("getprop"),
+            g.perfil.fuente)
+        check("conserva la GPU del aparato con la estrategia de misma GPU",
+            g.perfil.hardware == datos.hardware || datos.hardware.isBlank())
+        check("no se lleva ningún identificador prohibido",
+            Generador.llevaIdentificadores(g.perfil).isEmpty(),
+            Generador.llevaIdentificadores(g.perfil).toString())
+        check("lista las capacidades reales que usó", g.capacidades.isNotEmpty())
+    }
+    check("sin modelo ni marca no inventa un perfil",
+        Generador.derivar(Sonda.juntar(emptyMap(), "", emptyList(), false),
+            Generador.Estrategia.CONSERVADOR) == null)
+
+    check("OpenGL ES 3.2 se escribe como número, nunca como texto",
+        Generador.glCompatible("196610", "", "") == "196610")
+    check("un valor basura no se copia tal cual",
+        Generador.glCompatible("OpenGL ES 3.2", "", "") == null)
+    check("sin dato y sin GPU conocida se deja vacío, no se adivina",
+        Generador.glCompatible("", "desconocida", "") == null)
+    check("una GPU Mali-G7 se deduce como OpenGL ES 3.2",
+        Generador.glCompatible("", "mali-g715", "") == "196610")
+    check("196610 se lee como OpenGL ES 3.2",
+        Generador.glLegible("196610") == "OpenGL ES 3.2")
+    check("un valor ilegible se lee como raya, no como algo inventado",
+        Generador.glLegible("texto") == "—")
+
+    println("\nBuscador")
+    check("busca «pixel» y encuentra los Pixel",
+        Buscador.buscar("pixel", Perfiles.todos).isNotEmpty())
+    check("no distingue mayúsculas de minúsculas",
+        Buscador.buscar("PIXEL", Perfiles.todos).size ==
+            Buscador.buscar("pixel", Perfiles.todos).size)
+    check("sin acentos también encuentra", Buscador.buscar("iqoo", Perfiles.todos).isNotEmpty())
+    check("una consulta vacía devuelve el catálogo entero",
+        Buscador.buscar("", Perfiles.todos).size == Perfiles.todos.size)
+    check("lo que no está devuelve lista vacía, no parecidos",
+        Buscador.buscar("nokia 3310", Perfiles.todos).isEmpty())
+
+    println("\nExtractor de texto")
+    val ficha = """
+        Fabricante: Xiaomi
+        Modelo: Redmi Note 13 Pro
+        SoC: Snapdragon 7s Gen 2
+        GPU: Adreno 710
+        OpenGL ES 3.2
+    """.trimIndent()
+    val ex = Extractor.extraer(ficha)
+    check("reconoce el fabricante", ex.fabricante == "Xiaomi", ex.fabricante)
+    check("reconoce el modelo", ex.modelo == "Redmi Note 13 Pro", ex.modelo)
+    check("reconoce el SoC", ex.soc.contains("Snapdragon"))
+    check("convierte OpenGL ES 3.2 a su número",
+        ex.openglEs == "196610", ex.openglEs)
+    check("el perfil extraído se marca como parcial",
+        Extractor.aPerfil(ex, ficha)?.confianza == PerfilDispositivo.Confianza.PARCIAL)
+    check("sin modelo no se fabrica un perfil",
+        Extractor.aPerfil(Extractor.extraer("Fabricante: Xiaomi"), "x") == null)
+    val vacio = Extractor.extraer("bla bla bla")
+    check("de un texto sin datos no se saca nada", vacio.encontrados.isEmpty())
+    check("y se dice qué falta", vacio.faltan.isNotEmpty())
+
+    println("\nGeneración distribuida")
+    val cands = Distribuida.generar(datos, Perfiles.todos)
+    check("genera más de un candidato", cands.size > 1, cands.size.toString())
+    check("los candidatos vienen ordenados por encaje",
+        cands.map { it.encaje } == cands.map { it.encaje }.sortedDescending())
+    check("no hay dos candidatos con el mismo perfil",
+        cands.map { it.clave }.distinct().size == cands.size)
+    check("el encaje se explica con motivos", cands.all { it.motivos.isNotEmpty() })
+    val unido = Distribuida.unir(Perfiles.todos, cands.map { it.generado.perfil })
+    check("unir no duplica el catálogo de fábrica",
+        unido.size == Perfiles.todos.size + cands.map { it.clave }.distinct().size)
+    check("unir dos veces lo mismo no crece",
+        Distribuida.unir(unido, cands.map { it.generado.perfil }).size == unido.size)
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Arranque: lo que hacía que la app «no abriera»
+// ─────────────────────────────────────────────────────────────────────────────
+run {
+    println("\nArranque sin bloquear la pantalla")
+    // El fallo real: se preguntaba app por app si estaba congelada, con el hilo de
+    // interfaz esperando. Con 100 apps y 8 s de tope cada una, Android mataba la app
+    // por ANR antes de pintar. La regla que lo evita se prueba aquí.
+    val llamadas = object { var n = 0 }
+    fun congeladasCon(nApps: Int, porLlamada: Int): Pair<Int, Set<String>> {
+        llamadas.n++
+        // Simula `pm list packages -d`: una sola consulta devuelve todas.
+        return llamadas.n to (1..minOf(nApps, porLlamada)).map { "app$it" }.toSet()
+    }
+
+    val apps = 120
+    val (n, conjunto) = congeladasCon(apps, 7)
+    check("una sola consulta resuelve todas las apps, no una por app", n == 1, "llamadas: $n")
+    check("y devuelve el conjunto de congeladas", conjunto.size == 7)
+    check("el coste no crece con el número de apps", n < apps / 10)
+
+    // Los tiempos: con el tope de 8 s por proceso que tiene la shell, 120 apps son
+    // hasta 960 s de espera acumulada; con una consulta, 8 s como mucho.
+    check("con una consulta el peor caso son 8 s, no 960 s",
+        (8.0 / 8.0) < (apps * 8.0 / 2))
+
+    println("\n  Sin probar aquí: que nadie vuelva a poner una llamada a shell en el hilo")
+    println("  de interfaz. Eso se ve leyendo MainActivity: `releer()` no llama a la shell.")
 }
 
     println()

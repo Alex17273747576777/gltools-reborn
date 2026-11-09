@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +29,7 @@ enum class Seccion(val titulo: String, val icono: String) {
     DIAGNOSTICO("Diag.", "◈"),
     COMPATIBILIDAD("Compat.", "◇"),
     APLICADO("Aplicado", "◐"),
+    APRENDER("Aprender", "✧"),
 }
 
 @Composable
@@ -62,12 +64,29 @@ fun PantallaPrincipal(
     onProbarCompatibilidad: () -> Unit,
     fichas: List<Ficha>,
     onPanel: (String) -> Unit,
+    datosSonda: Sonda.Datos?,
+    biblioteca: List<PerfilDispositivo>,
+    onSondar: () -> Unit,
+    onGuardarPerfil: (PerfilDispositivo) -> Unit,
+    onGuardarVarios: (List<PerfilDispositivo>) -> Unit,
+    onBorrarPerfil: (String) -> Unit,
+    onSeleccionarPerfil: (PerfilDispositivo) -> Unit,
     onPerfil: (PerfilDispositivo) -> Unit,
     onAplicar: () -> Unit,
     onRestaurar: () -> Unit,
     onRefrescar: () -> Unit,
 ) {
     var seccion by remember { mutableStateOf(Seccion.PERFILES) }
+
+    // Estado de la sección Aprender. Vive aquí, no dentro del LazyColumn: la lambda de
+    // contenido de un LazyColumn no es @Composable y `remember` no compila ahí dentro.
+    var consulta by remember { mutableStateOf("") }
+    var textoPegado by remember { mutableStateOf("") }
+    var extraido by remember { mutableStateOf<Extractor.Extraido?>(null) }
+    var candidatos by remember { mutableStateOf<List<Distribuida.Candidato>>(emptyList()) }
+    val catalogoPerfiles = remember(biblioteca) {
+        Distribuida.unir(Perfiles.todos, biblioteca)
+    }
 
     Scaffold(
         containerColor = Cristal.fondoArriba,
@@ -283,6 +302,261 @@ fun PantallaPrincipal(
                     }
                 }
 
+                Seccion.APRENDER -> {
+                    item {
+                        Text(
+                            "Buscar, extraer y generar",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Cristal.texto,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "El catálogo de fábrica son ${Perfiles.todos.size} perfiles. Aquí puedes " +
+                                "buscar entre ellos y los tuyos, generar perfiles a partir de lo que " +
+                                "tu teléfono declara de verdad, y extraerlos de un texto pegado.",
+                            fontSize = 12.sp, lineHeight = 18.sp, color = Cristal.textoSuave,
+                        )
+                    }
+
+                    // ── Búsqueda
+                    item { Etiqueta("BUSCAR EN EL CATÁLOGO (${catalogoPerfiles.size})") }
+                    item {
+                        CampoTexto(
+                            valor = consulta,
+                            onCambio = { consulta = it },
+                            pista = "pixel · iqoo · adreno · tecno · helio…",
+                        )
+                    }
+                    val hallados = if (consulta.isBlank()) emptyList()
+                    else Buscador.buscar(consulta, catalogoPerfiles)
+                    if (consulta.isNotBlank()) {
+                        if (hallados.isEmpty()) {
+                            item {
+                                Text(
+                                    "Sin resultados para «$consulta». No se rellena con parecidos: " +
+                                        "si no está, no está.",
+                                    fontSize = 12.sp, color = Cristal.ambar,
+                                )
+                            }
+                        } else {
+                            items(hallados) { r ->
+                                Column(Modifier.fillMaxWidth().vidrio(14).padding(13.dp)) {
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                    ) {
+                                        Text(r.perfil.nombre, fontSize = 14.sp,
+                                            color = Cristal.texto, fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.weight(1f))
+                                        Text(
+                                            "encaje ${r.puntuacion}",
+                                            fontSize = 10.sp, color = Cristal.cian,
+                                        )
+                                    }
+                                    Text(
+                                        r.motivos.joinToString(" · "),
+                                        fontSize = 10.sp, color = Cristal.textoSuave,
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Boton("Usar este perfil", Cristal.violeta, Modifier.weight(1f)) {
+                                            onSeleccionarPerfil(r.perfil)
+                                        }
+                                        if (biblioteca.any { it.id == r.perfil.id }) {
+                                            Boton("Borrar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                                onBorrarPerfil(r.perfil.id)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Generar desde el aparato real
+                    item { Etiqueta("GENERAR DESDE TU TELÉFONO") }
+                    item {
+                        if (datosSonda == null) {
+                            Aviso(
+                                "Todavía no se han leído las propiedades del teléfono. Hace falta " +
+                                    "Shizuku con permiso: sin shell no se puede leer `getprop`.",
+                                Cristal.ambar,
+                            )
+                        } else {
+                            Column(Modifier.fillMaxWidth().vidrio(16).padding(14.dp)) {
+                                Text(datosSonda.resumen, fontSize = 12.sp, color = Cristal.texto,
+                                    fontWeight = FontWeight.Medium)
+                                if (!datosSonda.completa) {
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(
+                                        "Faltan datos básicos. Se puede generar un perfil, pero " +
+                                            "quedará incompleto y así se dirá.",
+                                        fontSize = 11.sp, color = Cristal.ambar,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Boton("Volver a leer el teléfono", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                onSondar()
+                            }
+                            Boton("Generar todos", Cristal.verde, Modifier.weight(1f)) {
+                                datosSonda?.let { d ->
+                                    candidatos = Distribuida.generar(d, catalogoPerfiles)
+                                }
+                            }
+                        }
+                    }
+                    items(candidatos) { c ->
+                        Column(Modifier.fillMaxWidth().vidrio(16).padding(14.dp)) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(c.generado.estrategia.titulo, fontSize = 13.sp,
+                                        color = Cristal.texto, fontWeight = FontWeight.SemiBold)
+                                    Text(c.generado.perfil.nombre, fontSize = 11.sp,
+                                        color = Cristal.cian)
+                                }
+                                Text("${c.encaje}", fontSize = 18.sp, color = Cristal.violeta,
+                                    fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                c.generado.estrategia.explicacion,
+                                fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.textoSuave,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(c.motivos.joinToString(" · "), fontSize = 10.sp,
+                                color = Cristal.textoSuave)
+                            c.generado.avisos.forEach { a ->
+                                Spacer(Modifier.height(4.dp))
+                                Text("• $a", fontSize = 10.sp, lineHeight = 15.sp,
+                                    color = Cristal.ambar)
+                            }
+                            Spacer(Modifier.height(9.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Boton("Guardar y usar", Cristal.violeta, Modifier.weight(1f)) {
+                                    onGuardarPerfil(c.generado.perfil)
+                                    onSeleccionarPerfil(c.generado.perfil)
+                                }
+                                Boton("Usar sin guardar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                    onSeleccionarPerfil(c.generado.perfil)
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Extraer de un texto
+                    item { Etiqueta("EXTRAER DE UN TEXTO PEGADO") }
+                    item {
+                        Text(
+                            "Pega una ficha de especificaciones (de una tienda, de una caja, de " +
+                                "donde sea). Se reconocen marca, modelo, device, SoC, GPU y OpenGL ES. " +
+                                "Lo que no aparezca se queda vacío: no se rellena a ojo.",
+                            fontSize = 11.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
+                        )
+                    }
+                    item {
+                        CampoTexto(
+                            valor = textoPegado,
+                            onCambio = { textoPegado = it; extraido = null },
+                            pista = "Fabricante: …\nModelo: …\nSoC: …",
+                            lineas = 5,
+                        )
+                    }
+                    item {
+                        Boton("Extraer", Cristal.cian, Modifier.fillMaxWidth()) {
+                            extraido = if (textoPegado.isBlank()) null
+                            else Extractor.extraer(textoPegado)
+                        }
+                    }
+                    extraido?.let { e ->
+                        item {
+                            Column(Modifier.fillMaxWidth().vidrio(16).padding(14.dp)) {
+                                Text(e.resumen, fontSize = 13.sp, color = Cristal.texto,
+                                    fontWeight = FontWeight.Medium)
+                                Spacer(Modifier.height(6.dp))
+                                Fila("Fabricante", e.fabricante)
+                                Fila("Modelo", e.modelo)
+                                Fila("Device", e.device)
+                                Fila("SoC", e.soc)
+                                Fila("GPU", e.gpu)
+                                Fila("OpenGL ES", if (e.openglEs.isBlank()) ""
+                                else "${Generador.glLegible(e.openglEs)} (${e.openglEs})")
+                                if (e.faltan.isNotEmpty()) {
+                                    Spacer(Modifier.height(6.dp))
+                                    Text(
+                                        "No apareció: ${e.faltan.joinToString(", ")}.",
+                                        fontSize = 10.sp, color = Cristal.ambar,
+                                    )
+                                }
+                                val perfil = Extractor.aPerfil(e, textoPegado)
+                                if (perfil == null) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "Con esto no se puede hacer un perfil: falta marca o " +
+                                            "modelo, y sin eso no hay nada que escribir.",
+                                        fontSize = 11.sp, color = Cristal.rojo,
+                                    )
+                                } else {
+                                    Spacer(Modifier.height(9.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Boton("Guardar y usar", Cristal.violeta, Modifier.weight(1f)) {
+                                            onGuardarPerfil(perfil)
+                                            onSeleccionarPerfil(perfil)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Los míos
+                    item { Etiqueta("TUS PERFILES (${biblioteca.size})") }
+                    if (biblioteca.isEmpty()) {
+                        item {
+                            Text(
+                                "Todavía no has guardado ninguno. Los que generes o extraigas " +
+                                    "aparecerán aquí, y en la búsqueda de arriba.",
+                                fontSize = 12.sp, color = Cristal.textoSuave,
+                            )
+                        }
+                    } else {
+                        items(biblioteca) { p ->
+                            Column(Modifier.fillMaxWidth().vidrio(14).padding(13.dp)) {
+                                Text(p.nombre, fontSize = 13.sp, color = Cristal.texto,
+                                    fontWeight = FontWeight.Medium)
+                                Text(p.fuente, fontSize = 10.sp, lineHeight = 15.sp,
+                                    color = Cristal.textoSuave)
+                                Spacer(Modifier.height(8.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Boton("Usar", Cristal.violeta, Modifier.weight(1f)) {
+                                        onSeleccionarPerfil(p)
+                                    }
+                                    Boton("Borrar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                        onBorrarPerfil(p.id)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Aviso(
+                            "«Generación distribuida» aquí significa varios generadores " +
+                                "trabajando a la vez dentro de este teléfono, cada uno con su " +
+                                "criterio, y un encaje que mide parecido con tu aparato. No es " +
+                                "una red de máquinas: llamarlo así sería vender otra cosa.",
+                            Cristal.cian,
+                        )
+                    }
+                }
+
                 Seccion.APLICADO -> {
                     item {
                         Aviso(
@@ -472,6 +746,49 @@ private fun PildoraFlotante(
                     color = if (sel) Cristal.texto else Cristal.textoSuave,
                     maxLines = 1,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Se dibuja algo ANTES de tener datos.
+ *
+ * El arranque anterior esperaba a la shell antes de pintar nada: si la shell tardaba,
+ * la pantalla se quedaba en negro y Android mataba la app. Este esqueleto se ve al
+ * instante y no depende de Shizuku para nada.
+ */
+@Composable
+fun PantallaArrancando(error: String? = null) {
+    Box(
+        Modifier.fillMaxSize().background(
+            Brush.verticalGradient(listOf(Cristal.fondoArriba, Cristal.fondoMedio, Cristal.fondoAbajo))
+        ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.padding(36.dp).vidrio(26).padding(26.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                "GLTOOLS",
+                fontSize = 13.sp, letterSpacing = 5.sp, color = Cristal.cian,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "REBORN",
+                fontSize = 30.sp, letterSpacing = 1.sp, color = Cristal.texto,
+                fontWeight = FontWeight.Light,
+            )
+            Spacer(Modifier.height(18.dp))
+            if (error == null) {
+                Text("Leyendo el teléfono…", fontSize = 12.sp, color = Cristal.textoSuave)
+            } else {
+                Text("Algo falló al arrancar", fontSize = 13.sp, color = Cristal.rojo,
+                    fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(8.dp))
+                Text(error, fontSize = 11.sp, color = Cristal.textoSuave, lineHeight = 17.sp)
             }
         }
     }
@@ -828,5 +1145,47 @@ private fun FilaFicha(f: Ficha, onPanel: () -> Unit) {
             f.hechos.firstOrNull()?.accion ?: "—",
             fontSize = 12.sp, color = Cristal.textoSuave,
         )
+    }
+}
+
+/** Campo de texto de cristal. Sin Material de por medio: el fondo lo pone el tema. */
+@Composable
+private fun CampoTexto(
+    valor: String,
+    onCambio: (String) -> Unit,
+    pista: String,
+    lineas: Int = 1,
+) {
+    androidx.compose.foundation.text.BasicTextField(
+        value = valor,
+        onValueChange = onCambio,
+        singleLine = lineas == 1,
+        maxLines = lineas,
+        textStyle = androidx.compose.ui.text.TextStyle(
+            color = Cristal.texto, fontSize = 13.sp, lineHeight = 19.sp,
+        ),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(Cristal.violeta),
+        modifier = Modifier
+            .fillMaxWidth()
+            .vidrio(14)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        decorationBox = { interior ->
+            if (valor.isEmpty()) {
+                Text(pista, fontSize = 12.sp, color = Cristal.textoSuave.copy(alpha = 0.6f))
+            }
+            interior()
+        },
+    )
+}
+
+@Composable
+private fun Fila(clave: String, valor: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(clave, fontSize = 11.sp, color = Cristal.textoSuave)
+        Text(valor.ifBlank { "—" }, fontSize = 11.sp, color = Cristal.texto,
+            fontFamily = FontFamily.Monospace)
     }
 }

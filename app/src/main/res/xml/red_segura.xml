@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MODO AVION: cero dominios permitidos.
+
+  El permiso de INTERNET existe (para la busqueda de datos opcional de la seccion
+  Aprender), pero el sistema no puede abrir ni una conexion: networkSecurityConfig
+  exige confianza explicita y aqui no hay ni un dominio de confianza, y
+  cleartextTrafficPermitted queda en false. Con el telefono en modo avion, o sin
+  Shizuku, la app funciona igual porque no depende de la red para nada.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors />
+    </base-config>
+</network-security-config>

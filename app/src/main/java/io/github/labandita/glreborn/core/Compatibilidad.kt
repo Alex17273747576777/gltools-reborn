@@ -46,6 +46,31 @@ class Compatibilidad(private val shell: Shell) {
         ).joinToString(" ")
     )
 
+    /**
+     * Lee del teléfono lo que hace falta para generar perfiles.
+     *
+     * Se pide en UNA llamada a la shell, no una por propiedad: cada `correr()` abre un
+     * proceso, y en un teléfono modesto eso se nota.
+     */
+    fun sondar(): Sonda.Datos {
+        val props = try {
+            val salida = shell.correr(Sonda.comando())?.texto.orEmpty()
+            // Se pide una por línea, así que se numera la respuesta con las claves.
+            val valores = salida.lineSequence().map { it.trim() }.toList()
+            Sonda.CLAVES.mapIndexedNotNull { i, clave ->
+                valores.getOrNull(i)?.takeIf { it.isNotBlank() }?.let { clave to it }
+            }.toMap()
+        } catch (t: Throwable) {
+            emptyMap()
+        }
+        return Sonda.juntar(
+            props = props,
+            versionAndroid = Build.VERSION.RELEASE,
+            arquitectura = Build.SUPPORTED_ABIS.toList(),
+            esHuawei = esHuawei(),
+        )
+    }
+
     fun datosBasicos(): List<Pair<String, String>> = listOf(
         "Android" to "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
         "Fabricante" to Build.MANUFACTURER.replaceFirstChar { it.uppercase() },

@@ -174,6 +174,16 @@ object Perfiles {
         RED_MAGIC_10_PRO, RED_MAGIC_11_PRO,
     )
 
+    /**
+     * El mismo catálogo, más lo que se genere o extraiga en el teléfono.
+     *
+     * Se deja aparte a propósito: [todos] es la lista de fábrica y hay pruebas que
+     * cuentan siete perfiles y comprueban que el censo cuadra. Si alguien añade aquí
+     * un perfil generado, esas pruebas fallarían — y es justo lo que se quiere.
+     */
+    fun conExtra(extra: List<PerfilDispositivo>): List<PerfilDispositivo> =
+        Distribuida.unir(todos, extra)
+
     fun porId(id: String): PerfilDispositivo? = todos.firstOrNull { it.id == id }
 
     /** Cuántos perfiles están completos. Se publica en la interfaz: no se esconde nunca. */

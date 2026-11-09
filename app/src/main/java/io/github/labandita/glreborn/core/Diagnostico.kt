@@ -67,6 +67,9 @@ class Diagnostico(
         "No puede garantizar que tu fabricante permita cambiar ro.product.model.",
         "No toca IMEI, número de serie, MAC ni Android ID: eso no es un perfil, es una identidad.",
         "No descarga nada: no hay servidor, ni cuentas, ni comprobación de compra.",
+        "Ve las apps con icono de lanzador y las que responden a VIEW. Las que corren " +
+            "en segundo plano sin icono pueden no salir: se dejó de pedir QUERY_ALL_PACKAGES " +
+            "a propósito, porque da acceso a la lista completa de programas instalados.",
         "No modifica otras apps ni sus APK: cambia lo que el sistema declara del teléfono.",
     )
 }

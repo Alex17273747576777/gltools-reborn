@@ -125,3 +125,60 @@ sha256sum GLToolsReborn-1.4.0-release.apk
 
 Y en la app: **Útil → cualquier app → Panel**. Si es la primera vez, dirá «Todavía no se le
 aplicó nada a esta app»; congela algo y vuelve a abrir el panel.
+
+---
+
+# 1.5.0 — la app ya abre, y aprende perfiles
+
+Fecha: 8 de noviembre de 2026.
+
+## El fallo que reportó el usuario: «no abre»
+
+En un TECNO BG7 (Android 13, 4 GB) con Shizuku concedido, la 1.3.0 no llegaba a pintar.
+**Causa, en el código, no una suposición:** `MainActivity.releer()` corría en el hilo de
+interfaz y, por cada app instalada, abría un proceso de shell para preguntar si estaba
+congelada (`GestorApps.estaCongelada` → `pm list packages -d`). Con ~100 apps y un tope
+de 8 s por consulta, el arranque podía tardar minutos; Android mata por ANR antes. Además
+se ejecutaban las 9 pruebas de compatibilidad seguidas y cualquier excepción cerraba la app.
+
+| Antes (1.3.0) | Ahora (1.5.0) |
+|---|---|
+| 1 consulta de shell **por app**, en el hilo de UI | **1 consulta** en total (`pm list packages -d`) |
+| Nada se pintaba hasta terminar | La pantalla se pinta **antes**, con esqueleto |
+| Una excepción = app cerrada | Se convierte en resultado rojo con el mensaje real |
+| Arranque en negro si algo falla | Pantalla de error con el mensaje, y la app sigue |
+
+## Lo nuevo, y cómo se ha medido
+
+| Comprobación | Resultado |
+|---|---|
+| `:app:pruebasNucleo` | **147 comprobaciones**, 0 fallos (60 nuevas: sonda, generador, buscador, extractor, distribuida, arranque) |
+| `:app:lintDebug` | **0 errores**, 10 avisos |
+| `:app:assembleRelease` | APK firmado, **1.198.617 B** |
+| `apksigner verify` | OK · misma clave `1ff4c6ee…` (**actualiza encima de 1.3.0**) |
+| `aapt2 dump permissions` | INTERNET, POST_NOTIFICATIONS, shizuku API_V23, DYNAMIC_RECEIVER… |
+| `QUERY_ALL_PACKAGES` | **eliminado**, verificado con `aapt2` |
+| `networkSecurityConfig` dentro del APK | `cleartextTrafficPermitted=false` y `<trust-anchors/>` **vacío**, comprobado con `aapt2 dump xmltree` |
+| `assets/panel/index.html` | dentro, 8.893 B |
+
+## Lo que NO está probado
+
+- **No se ha instalado en el teléfono del usuario.** Sigue sin haber `/dev/kvm` aquí. Lo que
+  sí está: la causa del ANR identificada en el código, y las tres cosas que la provocaban
+  quitadas del hilo de interfaz.
+- **La lectura real de `getprop` en un TECNO no se ha ejecutado aquí.** El intérprete de la
+  salida y las reglas de generación sí están probados con una salida realista de ese mismo
+  modelo (marca, modelo, device, OpenGL ES 196610, Android 13).
+- La notificación de reversión no se ha visto en pantalla; sí está verificado que el canal
+  se crea y que el permiso está declarado.
+
+## Cómo comprobarlo en dos minutos
+
+```bash
+aapt2 dump permissions GLToolsReborn-1.5.0-release.apk     # 4 líneas, sin QUERY_ALL_PACKAGES
+aapt2 dump xmltree --file res/e5.xml GLToolsReborn-1.5.0-release.apk   # red cerrada
+```
+
+En la app: si abre y se ve «Leyendo el teléfono…» antes que nada, el ANR está resuelto.
+Después: **Aprender → Generar todos**, y debería aparecer tu TECNO con su GPU y su
+OpenGL ES leídos del aparato.

@@ -36,9 +36,22 @@ class GestorApps(
     }
 
     /** ¿Está congelada ahora mismo? Se pregunta al sistema, no se supone. */
-    fun estaCongelada(paquete: String): Boolean {
-        val r = shell.correr("pm list packages -d")?.texto ?: return false
-        return r.lineSequence().any { it.trim() == "package:$paquete" }
+    fun estaCongelada(paquete: String): Boolean = paquete in congeladas()
+
+    /**
+     * Todas las apps deshabilitadas en UNA llamada.
+     *
+     * Antes se preguntaba app por app: con 100 apps instaladas eso son 100 procesos de
+     * shell, y en un teléfono modesto la interfaz se quedaba esperando hasta que Android
+     * la mataba. Una sola consulta devuelve lo mismo.
+     */
+    fun congeladas(): Set<String> {
+        val r = shell.correr("pm list packages -d")?.texto ?: return emptySet()
+        return r.lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("package:") }
+            .map { it.removePrefix("package:") }
+            .toSet()
     }
 
     fun congelar(paquete: String): Resultado {

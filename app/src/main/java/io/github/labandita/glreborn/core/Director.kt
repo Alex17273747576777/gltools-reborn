@@ -19,6 +19,7 @@ class Director(context: Context) {
     private val app = context.applicationContext
     private val registro = Registro(app)
     private val aplicado = Aplicado(app)
+    private val biblioteca = Biblioteca(app)
 
     private var ejecutor: Ejecutor? = null
 
@@ -26,6 +27,13 @@ class Director(context: Context) {
     private val shell = Shell()
     fun shell(): Shell = shell
     fun hayShell(): Boolean = shell.disponible()
+
+    /** Ejecuta algo que habla con la shell, y devuelve null si falla en vez de tumbar la app. */
+    fun <T> conShell(bloque: () -> T): T? = try {
+        if (shell.disponible()) bloque() else null
+    } catch (t: Throwable) {
+        null
+    }
     fun apps(): GestorApps = GestorApps(shell, registro, aplicado)
     fun sistema(): Sistema = Sistema(shell, aplicado)
     fun pantalla(): AjustesPantalla = AjustesPantalla(shell)
@@ -51,6 +59,9 @@ class Director(context: Context) {
 
     fun estado(): Estado = estado
     fun registro(): Registro = registro
+
+    /** El archivo de perfiles propios (generados o extraídos). */
+    fun biblioteca(): Biblioteca = biblioteca
 
     fun descripcion(): String = when (estado) {
         Estado.SHIZUKU_LISTO -> "Shizuku activo y con permiso: se puede escribir sin root."

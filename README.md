@@ -61,6 +61,34 @@ eso puede funcionar en Huawei sin GMS). Verificado con Lint `NewApi` = 0, y con 
 pestaña **Compat.**, que prueba en tu propio teléfono cada función y te dice cuáles
 responden de verdad. Detalle: [COMPATIBILIDAD-ANDROID.md](COMPATIBILIDAD-ANDROID.md).
 
+## Aprender: buscar, extraer y generar perfiles (1.5.0)
+
+Sección **Aprender**. Tres cosas, y ninguna se inventa datos:
+
+- **Buscar** en el catálogo y en tus perfiles. Sin acentos y sin mayúsculas: `tecno`
+  encuentra `TECNO`. Si no hay, dice «sin resultados»; no rellena con parecidos.
+- **Generar desde tu teléfono.** Lee lo que el aparato **declara de verdad** (`getprop`
+  en una sola llamada) y deriva perfiles con cuatro criterios: mismo aparato, misma
+  familia, misma GPU, o el conservador que sólo toca marca y modelo. Cada candidato
+  trae un **encaje** —cuánto se parece a tu teléfono— con sus motivos: misma GPU, misma
+  placa, mismo OpenGL ES, y cuántos campos se pudieron leer.
+- **Extraer de un texto pegado.** Pega una ficha de especificaciones y reconoce marca,
+  modelo, device, SoC, GPU y OpenGL ES. Lo que no aparezca **queda vacío**.
+
+Dos reglas que se prueban en las 143 comprobaciones del núcleo:
+
+1. **Nada inventado.** Si el teléfono no declara `ro.opengles.version`, el perfil deja el
+   campo vacío en vez de escribir «OpenGL ES 3.2», que es texto y rompe la propiedad.
+2. **Nada que identifique el aparato.** El perfil derivado no se lleva número de serie,
+   IMEI ni MAC. Se comprueba con una lista de claves prohibidas, no con buena voluntad.
+
+Sobre **«generación distribuida»**: reparte el trabajo entre varios generadores dentro
+del propio teléfono y consolida por encaje. No es una red de máquinas, y en la pantalla
+se llama por su nombre.
+
+Tus perfiles se guardan en `filesDir/perfiles.json`, en texto plano: se pueden abrir,
+leer y borrar a mano. Un perfil que no puedes inspeccionar no es de fiar.
+
 ## Paneles por app (1.4.0)
 
 Cada app tiene **su propio panel**, en pestaña nueva **Aplicado** o con el botón *Panel* de
@@ -81,18 +109,25 @@ Javascript está encendido porque el panel lo necesita para pintar. Lo que está
 
 ## Permisos, uno por uno
 
-Son **tres**, y ninguno es mío de verdad. Tabla completa con motivo y origen en
-[PERMISOS.md](PERMISOS.md). Resumen:
+Tabla completa con motivo y origen en [PERMISOS.md](PERMISOS.md). Resumen de la 1.5.0:
 
 | Permiso | Quién lo declara | Para qué |
 |---|---|---|
 | `moe.shizuku.manager.permission.API_V23` | Shizuku / OmniShizuku | ejecutar la shell |
-| `android.permission.QUERY_ALL_PACKAGES` | el sistema | ver todas las apps instaladas |
+| `android.permission.POST_NOTIFICATIONS` | Android 13+ | un aviso: la reversión de resolución en 15 s |
+| `android.permission.INTERNET` | el sistema | **sólo** para la búsqueda opcional de *Aprender* |
 | `…DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | la añade AndroidX sola | proteger sus receptores internos |
 
-**No hay INTERNET, ni ubicación, ni cámara, ni contactos, ni almacenamiento, ni teléfono,
-ni SMS.** La ausencia de INTERNET no es un descuido: es la razón de que la app pueda
-funcionar en modo avión y de que no haya nada que enviar a ningún sitio.
+**Se quitó `QUERY_ALL_PACKAGES`** (existía hasta la 1.4.0). Consecuencia honesta: las
+apps sin icono de lanzador pueden no aparecer en la lista de congelar. Está escrito en
+*Diagnóstico* y en `PERMISOS.md`.
+
+**INTERNET no cambia lo de «funciona sin red»**: `res/xml/red_segura.xml` no declara ni
+un dominio de confianza y prohíbe el tráfico en claro, así que el sistema no puede abrir
+conexiones. Y nada depende de la red: en modo avión se puede aplicar un perfil, ver el
+panel de una app y generar perfiles del aparato.
+
+**No hay ubicación, ni cámara, ni contactos, ni almacenamiento, ni teléfono, ni SMS.**
 
 ## Utilidades (1.2.0)
 
@@ -109,7 +144,7 @@ Sección **Útil**, todo a través de la shell de Shizuku — los mismos permiso
 
 De dónde salió cada idea y qué se descartó a propósito: [FUNCIONES.md](FUNCIONES.md).
 
-## Las ocho pantallas
+## Las nueve pantallas
 
 - **Perfiles** — el estado real del teléfono arriba, el catálogo con su nivel de confianza,
   y *Aplicar* / *Restaurar*. Cada card dice si está VERIFICADO o PARCIAL y **qué falta**.
@@ -120,6 +155,8 @@ De dónde salió cada idea y qué se descartó a propósito: [FUNCIONES.md](FUNC
 - **Super** — diez fichas del TOP500, con los datos de la lista vigente. **Son simulación**:
   el teléfono *declara* llamarse LineShine; no tiene sus 13.789.440 núcleos. Va aquí y no
   en Perfiles para que nunca se confunda con un perfil de dispositivo.
+- **Aprender** — buscar en el catálogo, generar perfiles del aparato real (con su encaje
+  y sus avisos) y extraerlos de un texto pegado.
 - **Útil** — resolución con reversión automática, refresco, congelar apps, borrar caché,
   DNS privado y escala de animación. Cada tarjeta tiene su botón **Panel**.
 - **Aplicado** — una ficha por app con lo que se le hizo, y su panel en cristal.
@@ -140,11 +177,25 @@ código son de aquí.
 El blur es de Compose (`Modifier.vidrio()`), no captura de pantalla: no cuesta batería
 extra y no depende de la versión de Android.
 
+## Si la app «no abre»
+
+Pasó en un TECNO de 4 GB con la 1.3.0, y la causa era mía: al arrancar se preguntaba
+**una vez por app** si estaba congelada, en el hilo de interfaz, con 8 s de tope por
+consulta. Con ~100 apps eso no termina nunca y Android mata la app por ANR. En la 1.5.0:
+
+- Se pregunta **una sola vez** (`pm list packages -d` devuelve todas).
+- Todo lo que habla con la shell va **fuera del hilo de interfaz**.
+- La pantalla se pinta **antes** de leer nada, con un esqueleto de cristal.
+- Si algo falla al arrancar, sale el mensaje real en pantalla en vez de quedarse en negro.
+- Cada acción está envuelta: si revienta, se convierte en un resultado rojo, no en un cierre.
+
+Se puede comprobar leyendo `MainActivity`: `releer()` no contiene ni una llamada a la shell.
+
 ## Compilar
 
 ```bash
 ./gradlew :app:assembleDebug          # APK de depuración
-./gradlew :app:pruebasNucleo          # 87 comprobaciones del núcleo, sin emulador
+./gradlew :app:pruebasNucleo          # 143 comprobaciones del núcleo, sin emulador
 ```
 
 Para firmar el release hacen falta variables de entorno; **no hay ninguna clave en el
