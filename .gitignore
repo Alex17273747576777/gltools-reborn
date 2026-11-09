@@ -5,7 +5,9 @@ FIRMA.txt
 local.properties
 .gradle/
 build/
+# El APK de release sí se publica: es el entregable. El de debug no.
 apk/*.apk
+!apk/GLToolsReborn-*-release.apk
 
 # Lo compilado no se versiona, pero el APK vive en apk/ y persistirá en el espacio
 # de trabajo aunque no esté en git.
