@@ -12,7 +12,7 @@ build-tools 35.0.0.
 | Firma verificada | `apksigner verify --print-certs` | SHA-256 `baedd474…4647ffcca` |
 | La firma sale del entorno, no del archivo | compilar sin las variables `REBORN_*` | produce `app-release-unsigned.apk`: **no se firma sola** |
 | **Cero permiso de INTERNET** | `aapt2 dump permissions` sobre el APK | 0 coincidencias |
-| Núcleo: catálogo | `gradle :app:pruebasNucleo` | **51 comprobaciones, todas pasan** (contadas: \`grep -c 'check("' \` → 51) |
+| Núcleo: catálogo | `gradle :app:pruebasNucleo` | **51 comprobaciones, todas pasan** (contadas: `grep -c 'check("' ` → 51) |
 | Núcleo: escritura | idem, con ejecutor falso | escribe, omite vacíos, confirma |
 | Núcleo: bloqueo del fabricante | idem | **no declara éxito si no cambió** |
 | Núcleo: sin vía | idem | no aplica nada y lo dice |
