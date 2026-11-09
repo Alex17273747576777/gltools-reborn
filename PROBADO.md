@@ -30,6 +30,26 @@ build-tools 35.0.0.
 | El censo cuadra | verificados + parciales = total | cuadra |
 | Compila con el wrapper | `./gradlew assembleRelease` | OK, misma huella |
 
+## Comprobado sobre el APK final (no sobre el código)
+
+| Qué | Cómo | Resultado |
+|---|---|---|
+| Es un APK válido | `aapt2 dump badging` | `io.github.labandita.glreborn` v1.1.0 (code 2), minSdk 26, targetSdk 35 |
+| Tiene activity lanzable | idem | `MainActivity` con etiqueta «GLTools Reborn» |
+| El `ShizukuProvider` está en el manifest final | `aapt2 dump xmltree` | presente |
+| La lógica de seguridad sobrevive al ofuscado | `strings` sobre `classes.dex` extraído | «identidad del», «propiedad de arranque», «ro.serialno», «persist.» → presentes |
+| La etiqueta SIMULACIÓN llega al binario | idem | presente |
+| Los perfiles viajan dentro | idem | «Google Pixel 8 Pro», «LineShine», `196610` → presentes |
+| Compilación reproducible | borrar `build/` y recompilar | **927.095 bytes exactos**, idéntico al subido a Drive |
+
+### Un error de método que cometí y corrijo aquí
+
+Conté las cadenas con `grep -c` **sobre el APK comprimido** y salió 0 en todo. Concluí
+«la lógica no sobrevivió al ofuscado», y era falso: `grep` sobre un binario comprimido no
+ve dentro del `classes.dex`. Al extraer el DEX y usar `strings -a`, las cadenas estaban
+todas. Queda escrito porque es exactamente el tipo de error que produce un «no funciona»
+inventado.
+
 ## NO probado, y por qué
 
 - **No se ha instalado ni arrancado en un teléfono.** Esta máquina no tiene `/dev/kvm`,
