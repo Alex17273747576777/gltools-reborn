@@ -1,0 +1,17 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        // Shizuku se publica en Maven Central; no hay binarios propietarios.
+    }
+}
+rootProject.name = "GLToolsReborn"
+include(":app")

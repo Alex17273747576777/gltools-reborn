@@ -1,0 +1,11 @@
+# Nunca al repositorio:
+*.jks
+*.keystore
+FIRMA.txt
+local.properties
+.gradle/
+build/
+apk/*.apk
+
+# Lo compilado no se versiona, pero el APK vive en apk/ y persistirá en el espacio
+# de trabajo aunque no esté en git.
