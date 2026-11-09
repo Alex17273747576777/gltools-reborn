@@ -69,12 +69,18 @@ private fun App(
     var limites by remember { mutableStateOf<List<String>>(emptyList()) }
     var modo by remember { mutableStateOf(director.modo) }
     var superActiva by remember { mutableStateOf<Supercomputadora?>(null) }
+    var pantallaActual by remember { mutableStateOf<AjustesPantalla.Actual?>(null) }
+    var congeladas by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     fun releer() {
         onRefrescar()
         estado = director.estado()
         actual = director.telefoniaActual()
         apps = inventario.todas()
+        pantallaActual = if (director.hayShell()) director.pantalla().leer() else null
+        congeladas = if (director.hayShell()) {
+            apps.filter { director.apps().estaCongelada(it.paquete) }.map { it.paquete }.toSet()
+        } else emptySet()
         lineasDiag = diagnostico.lineas()
         limites = diagnostico.limites()
         if (estado == Director.Estado.SHIZUKU_SIN_PERMISO) onPedirShizuku()
@@ -114,6 +120,29 @@ private fun App(
             resultado = director.restaurar()
             actual = director.telefoniaActual()
         },
+        pantallaActual = pantallaActual,
+        congeladas = congeladas,
+        hayShell = director.hayShell(),
+        onFijarResolucion = { w, h, d ->
+            resultado = director.pantalla().aplicar(w, h, d)
+            pantallaActual = director.pantalla().leer()
+        },
+        onRevertirPantalla = {
+            resultado = director.pantalla().revertir()
+            pantallaActual = director.pantalla().leer()
+        },
+        onFijarRefresco = { hz -> resultado = director.pantalla().fijarRefresco(hz) },
+        onCongelar = { p ->
+            resultado = director.apps().congelar(p)
+            congeladas = if (congeladas.contains(p)) congeladas else congeladas + p
+        },
+        onDescongelar = { p ->
+            resultado = director.apps().descongelar(p)
+            congeladas = congeladas - p
+        },
+        onLimpiarCache = { p -> resultado = director.sistema().limpiarCache(p) },
+        onDns = { host -> resultado = director.sistema().dnsPrivado(host) },
+        onAnimaciones = { e -> resultado = director.sistema().escalasAnimacion(e) },
         onPerfil = { perfil = it },
         onAplicar = {
             val p = perfil

@@ -2,6 +2,7 @@ package io.github.labandita.glreborn.core
 
 import android.content.Context
 import io.github.labandita.glreborn.shizuku.EjecutorShizuku
+import io.github.labandita.glreborn.shizuku.Shell
 
 /**
  * El director de la casa: decide qué se puede aplicar y con qué, y no deja que la
@@ -19,6 +20,14 @@ class Director(context: Context) {
     private val registro = Registro(app)
 
     private var ejecutor: Ejecutor? = null
+
+    /** La shell de Shizuku: el resto de funciones de la app cuelgan de aquí. */
+    private val shell = Shell()
+    fun shell(): Shell = shell
+    fun hayShell(): Boolean = shell.disponible()
+    fun apps(): GestorApps = GestorApps(shell, registro)
+    fun sistema(): Sistema = Sistema(shell)
+    fun pantalla(): AjustesPantalla = AjustesPantalla(shell)
     private var estado: Estado = Estado.SIN_VIA
     private var original: Map<String, String> = emptyMap()
 

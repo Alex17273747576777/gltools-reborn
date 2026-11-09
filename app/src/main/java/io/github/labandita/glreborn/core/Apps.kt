@@ -1,0 +1,103 @@
+package io.github.labandita.glreborn.core
+
+import io.github.labandita.glreborn.shizuku.Shell
+
+/**
+ * Congelar, detener y desinstalar apps — con vuelta atrás.
+ *
+ * Con la shell de Shizuku (los mismos permisos que un `adb shell`), `pm` permite hacer
+ * esto sin root. Lo que se puede hacer sin vuelta atrás es lo que se marca como tal y
+ * se pide dos veces; lo demás se guarda en el registro y se deshace con un botón.
+ *
+ * Idea tomada de ZKMNEXT GameSpace (magiskmodule.com/zkmnext-gamespace) y de Buge App
+ * Manager: congelar apps para que no gasten batería sin desinstalarlas.
+ */
+class GestorApps(
+    private val shell: Shell,
+    private val registro: Registro?,
+) {
+
+    /** Paquetes que NO se tocan nunca: si se congelan, el teléfono deja de responder. */
+    val intocables: List<String> = listOf(
+        "android", "com.android.systemui", "com.android.settings", "com.android.phone",
+        "com.android.shell", "com.google.android.gms", "com.android.vending",
+        "moe.shizuku.privileged.api", "io.github.labandita.glreborn",
+        "com.android.providers.settings", "com.android.permissioncontroller",
+    )
+
+    fun esIntocable(paquete: String): Boolean = intocables.any { paquete == it || paquete.startsWith("$it.") }
+
+    private fun revisar(paquete: String): String? = when {
+        !shell.disponible() -> "Shizuku no está activo."
+        paquete.isBlank() -> "Paquete vacío."
+        esIntocable(paquete) -> "$paquete es parte del sistema: congelarlo puede dejar el teléfono sin interfaz."
+        else -> null
+    }
+
+    /** ¿Está congelada ahora mismo? Se pregunta al sistema, no se supone. */
+    fun estaCongelada(paquete: String): Boolean {
+        val r = shell.correr("pm list packages -d")?.texto ?: return false
+        return r.lineSequence().any { it.trim() == "package:$paquete" }
+    }
+
+    fun congelar(paquete: String): Resultado {
+        revisar(paquete)?.let { return Resultado(false, Via.SHIZUKU, it) }
+        val r = shell.correr("pm disable-user --user 0 $paquete")
+        if (r == null || !r.ok) {
+            return Resultado(false, Via.SHIZUKU, "No se pudo congelar: ${r?.texto ?: "sin respuesta"}")
+        }
+        registro?.apuntar("app:$paquete", "activa", "congelada", Modo.SEGURO)
+        val confirmado = estaCongelada(paquete)
+        return Resultado(
+            ok = confirmado,
+            via = Via.SHIZUKU,
+            detalle = if (confirmado) "$paquete congelada (confirmado en la lista del sistema)."
+            else "Se pidió congelar y el sistema no la lista como deshabilitada.",
+        )
+    }
+
+    fun descongelar(paquete: String): Resultado {
+        if (!shell.disponible()) return Resultado(false, Via.NINGUNA, "Shizuku no está activo.")
+        val r = shell.correr("pm enable $paquete")
+        val ok = r?.ok == true && !estaCongelada(paquete)
+        return Resultado(ok, Via.SHIZUKU,
+            if (ok) "$paquete activa de nuevo." else "No se pudo activar: ${r?.texto ?: "sin respuesta"}")
+    }
+
+    /** Cierra la app ahora. No la congela: vuelve a abrirse si la lanzas. */
+    fun detener(paquete: String): Resultado {
+        revisar(paquete)?.let { return Resultado(false, Via.SHIZUKU, it) }
+        val r = shell.correr("am force-stop $paquete")
+        return Resultado(r?.ok == true, Via.SHIZUKU,
+            if (r?.ok == true) "$paquete detenida." else "No se pudo detener.")
+    }
+
+    /** Congela todas las que se le pasen. Devuelve el recuento real, no el intentado. */
+    fun congelarVarias(paquetes: List<String>): Resultado {
+        var ok = 0
+        val fallos = mutableListOf<String>()
+        for (p in paquetes) {
+            val r = congelar(p)
+            if (r.ok) ok++ else fallos += "$p: ${r.detalle}"
+        }
+        return Resultado(
+            ok = ok > 0,
+            via = Via.SHIZUKU,
+            detalle = "$ok de ${paquetes.size} congeladas.",
+            lineas = fallos,
+        )
+    }
+
+    /**
+     * Desinstala. SIN vuelta atrás: por eso se exige confirmación explícita y no se
+     * ofrece como acción de un solo toque en ninguna parte de la interfaz.
+     */
+    fun desinstalar(paquete: String, confirmado: Boolean): Resultado {
+        revisar(paquete)?.let { return Resultado(false, Via.SHIZUKU, it) }
+        if (!confirmado) return Resultado(false, Via.SHIZUKU, "Falta la confirmación: esto no se deshace.")
+        val r = shell.correr("pm uninstall --user 0 $paquete")
+        return Resultado(r?.ok == true, Via.SHIZUKU,
+            if (r?.ok == true) "$paquete desinstalada para este usuario. No se puede deshacer desde aquí."
+            else "No se pudo desinstalar: ${r?.texto ?: "sin respuesta"}")
+    }
+}

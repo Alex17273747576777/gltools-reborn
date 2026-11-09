@@ -183,6 +183,48 @@ fun main() {
     check("los datos sin propiedad se enseñan aparte",
         Supercomputadoras.datosSoloInformativos(sc.first()).any { it.first == "Núcleos" })
 
+    println("\n14 · Apps: no se puede congelar el propio sistema")
+    // GestorApps necesita un Shell real para hablar con el teléfono, pero la lista de
+    // intocables y la comprobación son lógica pura: se prueban con una Shell que no
+    // existe, porque `revisar` corta antes de tocar nada.
+    val ga = GestorApps(io.github.labandita.glreborn.shizuku.Shell(), null)
+    for (k in listOf("android", "com.android.systemui", "com.android.settings", "com.android.phone",
+                     "com.google.android.gms", "io.github.labandita.glreborn")) {
+        check("bloquea congelar $k", ga.esIntocable(k), "debería ser intocable")
+    }
+    check("deja congelar una app normal", !ga.esIntocable("com.example.juego"))
+    check("bloquea también sus subpaquetes", ga.esIntocable("com.android.systemui.plugin"))
+    check("no confunde prefijos parecidos", !ga.esIntocable("com.example.android"))
+    check("sin Shizuku no congela nada",
+        !ga.congelar("com.example.juego").ok)
+    check("desinstalar exige confirmación",
+        !ga.desinstalar("com.example.juego", confirmado = false).ok)
+
+    println("\n15 · Pantalla: la densidad se calcula, no se inventa")
+    // La cuenta que evita dejar la interfaz inservible al bajar la resolución.
+    val ap = AjustesPantalla(io.github.labandita.glreborn.shizuku.Shell())
+    // 1080 px a 440 dpi → 720 px deben dar 440*720/1080 = 293 dpi
+    check("1080→720 a 440 dpi da 293", ap.densidadEquivalente(1080, 440, 720) == 293,
+        ap.densidadEquivalente(1080, 440, 720).toString())
+    // 1440 px a 560 dpi → 1080 px deben dar 420
+    check("1440→1080 a 560 dpi da 420", ap.densidadEquivalente(1440, 560, 1080) == 420,
+        ap.densidadEquivalente(1440, 560, 1080).toString())
+    check("misma resolución = misma densidad",
+        ap.densidadEquivalente(1080, 420, 1080) == 420)
+    check("sin Shizuku no aplica resolución", !ap.aplicar(720, 1600, 293).ok)
+    check("sin Shizuku no revierte", !ap.revertir().ok)
+
+    println("\n16 · Sistema: los límites se respetan")
+    val sis = Sistema(io.github.labandita.glreborn.shizuku.Shell())
+    check("legible: 512 B", Sistema.legible(512) == "512 B", Sistema.legible(512))
+    check("legible: 2048 = 2.0 KB", Sistema.legible(2048).startsWith("2.0"), Sistema.legible(2048))
+    check("legible: 5 MB", Sistema.legible(5L*1024*1024).startsWith("5.0"), Sistema.legible(5L*1024*1024))
+    check("escala no numérica se rechaza", !sis.escalasAnimacion("rápido").ok)
+    check("escala fuera de rango se rechaza", !sis.escalasAnimacion("5").ok)
+    check("sin Shizuku no toca el DNS", !sis.dnsPrivado("dns.google").ok)
+    check("sin Shizuku no limpia caché", !sis.limpiarCache("com.example").ok)
+    check("sin Shizuku no cambia animaciones", !sis.escalasAnimacion("0.5").ok)
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

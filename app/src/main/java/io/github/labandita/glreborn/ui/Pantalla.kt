@@ -23,6 +23,7 @@ enum class Seccion(val titulo: String) {
     PERFILES("Perfiles"),
     SUPER("Super"),
     APLICACIONES("Apps"),
+    UTILIDADES("Útil"),
     GPU("GPU"),
     DIAGNOSTICO("Diag."),
 }
@@ -42,6 +43,17 @@ fun PantallaPrincipal(
     onModo: () -> Unit,
     onSimular: (Supercomputadora) -> Unit,
     onDeshacer: () -> Unit,
+    pantallaActual: AjustesPantalla.Actual?,
+    congeladas: Set<String>,
+    hayShell: Boolean,
+    onFijarResolucion: (Int, Int, Int) -> Unit,
+    onRevertirPantalla: () -> Unit,
+    onFijarRefresco: (Int) -> Unit,
+    onCongelar: (String) -> Unit,
+    onDescongelar: (String) -> Unit,
+    onLimpiarCache: (String) -> Unit,
+    onDns: (String) -> Unit,
+    onAnimaciones: (String) -> Unit,
     onPerfil: (PerfilDispositivo) -> Unit,
     onAplicar: () -> Unit,
     onRestaurar: () -> Unit,
@@ -120,6 +132,99 @@ fun PantallaPrincipal(
                                 "la clave donde escribirlos. Se enseñan como información del sistema real, " +
                                 "no como algo que esta app pueda simular. Escribirlos sería inventar.",
                             Colores.ambar,
+                        )
+                    }
+                }
+
+                Seccion.UTILIDADES -> {
+                    item {
+                        if (!hayShell) {
+                            Aviso(
+                                "Estas funciones necesitan la shell de Shizuku. Sin ella no hacen nada: " +
+                                    "no hay botón que finja funcionar. Activa Shizuku y vuelve a abrir.",
+                                Colores.rojo,
+                            )
+                        } else {
+                            Aviso(
+                                "Todo lo de esta pantalla pasa por la shell de Shizuku, que da los mismos " +
+                                    "permisos que un adb shell. No es root: no toca el sistema de archivos raíz " +
+                                    "ni el kernel.",
+                                Colores.verde,
+                            )
+                        }
+                    }
+
+                    item { Etiqueta("PANTALLA") }
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            pantallaActual?.let { a ->
+                                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                    .background(Colores.superficie).padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("Actual", fontSize = 11.sp, color = Colores.textoSuave)
+                                    Text("${a.resolucion} @ ${a.densidad}dpi", fontSize = 12.sp,
+                                        color = Colores.texto, fontFamily = FontFamily.Monospace)
+                                }
+                            }
+                            Text("Bajar la resolución baja el trabajo de la GPU. La densidad se recalcula " +
+                                "sola para que todo siga del mismo tamaño.",
+                                fontSize = 11.sp, lineHeight = 15.sp, color = Colores.textoSuave)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Boton("720p", Colores.superficieAlta, Modifier.weight(1f)) {
+                                    onFijarResolucion(720, 1600, 293)
+                                }
+                                Boton("1080p", Colores.superficieAlta, Modifier.weight(1f)) {
+                                    onFijarResolucion(1080, 2400, 440)
+                                }
+                                Boton("Volver", Colores.ambar, Modifier.weight(1f)) { onRevertirPantalla() }
+                            }
+                            Aviso(
+                                "Si no confirmas en 15 segundos, el teléfono vuelve solo a su resolución. " +
+                                    "El comando de vuelta se lanza aparte: funciona aunque la app se cierre.",
+                                Colores.ambar,
+                            )
+                        }
+                    }
+                    item {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Boton("60 Hz", Colores.superficieAlta, Modifier.weight(1f)) { onFijarRefresco(60) }
+                            Boton("90 Hz", Colores.superficieAlta, Modifier.weight(1f)) { onFijarRefresco(90) }
+                            Boton("120 Hz", Colores.superficieAlta, Modifier.weight(1f)) { onFijarRefresco(120) }
+                        }
+                    }
+
+                    item { Spacer(Modifier.height(6.dp)) }
+                    item { Etiqueta("SISTEMA") }
+                    item {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Boton("Anim 0.5x", Colores.superficieAlta, Modifier.weight(1f)) { onAnimaciones("0.5") }
+                            Boton("Anim 1x", Colores.superficieAlta, Modifier.weight(1f)) { onAnimaciones("1.0") }
+                        }
+                    }
+                    item {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Boton("DNS Google", Colores.superficieAlta, Modifier.weight(1f)) { onDns("dns.google") }
+                            Boton("DNS Cloudflare", Colores.superficieAlta, Modifier.weight(1f)) { onDns("1dot1dot1dot1.cloudflare-dns.com") }
+                        }
+                    }
+                    item {
+                        Boton("Quitar DNS privado", Colores.ambar, Modifier.fillMaxWidth()) { onDns("off") }
+                    }
+
+                    item { Spacer(Modifier.height(6.dp)) }
+                    item { Etiqueta("CONGELAR APPS · libera batería sin desinstalar") }
+                    item {
+                        Text("Se puede congelar cualquier app instalada. Las del sistema están bloqueadas " +
+                            "en el código: congelar SystemUI deja el teléfono sin interfaz.",
+                            fontSize = 11.sp, lineHeight = 15.sp, color = Colores.textoSuave)
+                    }
+                    items(apps.take(40)) { a ->
+                        FilaAppAccion(
+                            app = a,
+                            congelada = congeladas.contains(a.paquete),
+                            onCongelar = { onCongelar(a.paquete) },
+                            onDescongelar = { onDescongelar(a.paquete) },
+                            onLimpiar = { onLimpiarCache(a.paquete) },
                         )
                     }
                 }
@@ -501,5 +606,41 @@ private fun TarjetaSuper(s: Supercomputadora, activa: Boolean, onSimular: () -> 
             "→ el teléfono declarará llamarse «${s.nombre}»",
             fontSize = 11.sp, color = Colores.textoSuave, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
         )
+    }
+}
+
+@Composable
+private fun FilaAppAccion(
+    app: Inventario.App,
+    congelada: Boolean,
+    onCongelar: () -> Unit,
+    onDescongelar: () -> Unit,
+    onLimpiar: () -> Unit,
+) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Colores.superficie)
+            .padding(12.dp),
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(app.nombre, fontSize = 13.sp, color = Colores.texto)
+                Text(app.paquete, fontSize = 10.sp, color = Colores.textoSuave,
+                    fontFamily = FontFamily.Monospace)
+            }
+            if (congelada) {
+                Text("CONGELADA", fontSize = 8.sp, letterSpacing = 0.8.sp,
+                    color = Colores.ambar, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (congelada) {
+                Boton("Activar", Colores.verde, Modifier.weight(1f)) { onDescongelar() }
+            } else {
+                Boton("Congelar", Colores.superficieAlta, Modifier.weight(1f)) { onCongelar() }
+            }
+            Boton("Borrar caché", Colores.superficieAlta, Modifier.weight(1f)) { onLimpiar() }
+        }
     }
 }

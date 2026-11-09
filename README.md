@@ -48,7 +48,22 @@ vista en Diagnóstico. El detalle completo está en [SEGURIDAD.md](SEGURIDAD.md)
 **No hay «acceso total»**, ni con el modo experto. Sin root no existe, y con root esta app
 no lo necesita: no hay un botón que finja dártelo.
 
-## Las cinco pantallas
+## Utilidades (1.2.0)
+
+Sección **Útil**, todo a través de la shell de Shizuku — los mismos permisos que un
+`adb shell`, sin root:
+
+- **Resolución** con densidad recalculada y **reversión automática en 15 s** si no
+  confirmas. El comando de vuelta corre aparte: funciona aunque la app se cierre.
+- **Frecuencia de refresco** a 60 / 90 / 120 Hz.
+- **Congelar apps** para que no gasten batería, sin desinstalarlas. Las del sistema están
+  bloqueadas en el código.
+- **Borrar caché** por app, midiendo antes y después.
+- **DNS privado** y **escala de animación**.
+
+De dónde salió cada idea y qué se descartó a propósito: [FUNCIONES.md](FUNCIONES.md).
+
+## Las seis pantallas
 
 - **Perfiles** — el estado real del teléfono arriba, el catálogo con su nivel de confianza,
   y *Aplicar* / *Restaurar*. Cada card dice si está VERIFICADO o PARCIAL y **qué falta**.
@@ -66,7 +81,7 @@ no lo necesita: no hay un botón que finja dártelo.
 
 ```bash
 ./gradlew :app:assembleDebug          # APK de depuración
-./gradlew :app:pruebasNucleo          # 51 pruebas del núcleo, sin emulador
+./gradlew :app:pruebasNucleo          # 70 pruebas del núcleo, sin emulador
 ```
 
 Para firmar el release hacen falta variables de entorno; **no hay ninguna clave en el
