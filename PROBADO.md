@@ -32,6 +32,25 @@ build-tools 35.0.0.
 | El censo cuadra | verificados + parciales = total | cuadra |
 | Compila con el wrapper | `./gradlew assembleRelease` | OK, misma huella |
 
+## Compatibilidad (1.3.0)
+
+| Qué | Cómo | Resultado |
+|---|---|---|
+| Mi código no llama APIs > Android 8 | Lint `NewApi` | **0** |
+| Errores de Lint | `lintDebug` | **0 errores**, 7 avisos |
+| Dependencias de Google Play | `gradle dependencies` | **ninguna** |
+| Arquitecturas | `aapt2 dump badging` | arm64-v8a, armeabi-v7a, x86, x86_64 |
+| Detección de Huawei/Honor | 6 pruebas de lógica pura | pasan |
+| Detección de HarmonyOS | idem | pasan |
+| La app se autoprueba en el equipo | pestaña **Compat.** | lanza `wm`, `pm`, `settings`, `cmd` de verdad |
+
+**Fallo real encontrado por Lint:** `getInstalledApplications` no devuelve todas las apps
+desde Android 11. Corregido con `QUERY_ALL_PACKAGES` + `<queries>`, y la app avisa si la
+lista viene cortada. Detalle completo en [COMPATIBILIDAD-ANDROID.md](COMPATIBILIDAD-ANDROID.md).
+
+**Sigue sin probarse:** instalar el APK en un teléfono real, un Huawei físico, y HarmonyOS
+NEXT (donde ninguna APK de Android se instala, ni esta).
+
 ## Comprobado sobre el APK final (no sobre el código)
 
 | Qué | Cómo | Resultado |

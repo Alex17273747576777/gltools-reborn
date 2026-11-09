@@ -28,6 +28,7 @@ class Director(context: Context) {
     fun apps(): GestorApps = GestorApps(shell, registro)
     fun sistema(): Sistema = Sistema(shell)
     fun pantalla(): AjustesPantalla = AjustesPantalla(shell)
+    fun compatibilidad(): Compatibilidad = Compatibilidad(shell)
     private var estado: Estado = Estado.SIN_VIA
     private var original: Map<String, String> = emptyMap()
 

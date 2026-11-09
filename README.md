@@ -54,6 +54,13 @@ vista en Diagnóstico. El detalle completo está en [SEGURIDAD.md](SEGURIDAD.md)
 **No hay «acceso total»**, ni con el modo experto. Sin root no existe, y con root esta app
 no lo necesita: no hay un botón que finja dártelo.
 
+## Compatibilidad
+
+Android **8.0 a 16** · cuatro arquitecturas · **cero dependencias de Google Play** (por
+eso puede funcionar en Huawei sin GMS). Verificado con Lint `NewApi` = 0, y con la
+pestaña **Compat.**, que prueba en tu propio teléfono cada función y te dice cuáles
+responden de verdad. Detalle: [COMPATIBILIDAD-ANDROID.md](COMPATIBILIDAD-ANDROID.md).
+
 ## Utilidades (1.2.0)
 
 Sección **Útil**, todo a través de la shell de Shizuku — los mismos permisos que un

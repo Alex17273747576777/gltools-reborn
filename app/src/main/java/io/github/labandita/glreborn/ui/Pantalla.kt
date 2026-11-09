@@ -26,6 +26,7 @@ enum class Seccion(val titulo: String) {
     UTILIDADES("Útil"),
     GPU("GPU"),
     DIAGNOSTICO("Diag."),
+    COMPATIBILIDAD("Compat."),
 }
 
 @Composable
@@ -54,6 +55,10 @@ fun PantallaPrincipal(
     onLimpiarCache: (String) -> Unit,
     onDns: (String) -> Unit,
     onAnimaciones: (String) -> Unit,
+    datosEquipo: List<Pair<String, String>>,
+    pruebasCompat: List<Compatibilidad.Prueba>,
+    resumenCompat: String,
+    onProbarCompatibilidad: () -> Unit,
     onPerfil: (PerfilDispositivo) -> Unit,
     onAplicar: () -> Unit,
     onRestaurar: () -> Unit,
@@ -270,6 +275,65 @@ fun PantallaPrincipal(
                                     )
                                 }
                             }
+                        }
+                    }
+                }
+
+                Seccion.COMPATIBILIDAD -> {
+                    item {
+                        Aviso(
+                            "Estas pruebas se ejecutan EN TU TELÉFONO, no en el mío: aquí no hay " +
+                                "emulador y no puedo probar cada Android ni cada Huawei. Cada línea " +
+                                "lanza el comando de verdad y enseña lo que responde.",
+                            Colores.verde,
+                        )
+                    }
+                    item { Etiqueta("TU EQUIPO") }
+                    item {
+                        Column(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                .background(Colores.superficie).padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            datosEquipo.forEach { (k, v) ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text(k, fontSize = 11.sp, color = Colores.textoSuave)
+                                    Text(v.take(30), fontSize = 11.sp, color = Colores.texto,
+                                        fontFamily = FontFamily.Monospace)
+                                }
+                            }
+                        }
+                    }
+                    item { Spacer(Modifier.height(6.dp)) }
+                    item { Etiqueta("RESULTADO · $resumenCompat") }
+                    items(pruebasCompat) { pr ->
+                        val color = when (pr.resultado) {
+                            Compatibilidad.Prueba.Estado.PASA -> Colores.verde
+                            Compatibilidad.Prueba.Estado.FALLA -> Colores.rojo
+                            Compatibilidad.Prueba.Estado.NO_APLICA -> Colores.ambar
+                        }
+                        val icono = when (pr.resultado) {
+                            Compatibilidad.Prueba.Estado.PASA -> "✓"
+                            Compatibilidad.Prueba.Estado.FALLA -> "✗"
+                            Compatibilidad.Prueba.Estado.NO_APLICA -> "—"
+                        }
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                                .background(Colores.superficie).padding(12.dp),
+                        ) {
+                            Text(icono, color = color, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(pr.nombre, fontSize = 12.sp, color = Colores.texto,
+                                    fontWeight = FontWeight.Medium)
+                                Text(pr.detalle, fontSize = 11.sp, lineHeight = 15.sp, color = color)
+                            }
+                        }
+                    }
+                    item {
+                        Spacer(Modifier.height(6.dp))
+                        Boton("Volver a probar", Colores.verde, Modifier.fillMaxWidth()) {
+                            onProbarCompatibilidad()
                         }
                     }
                 }

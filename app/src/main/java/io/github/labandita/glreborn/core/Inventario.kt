@@ -46,7 +46,20 @@ class Inventario(private val context: Context) {
 
     data class Resumen(val total: Int, val usuario: Int, val sistema: Int) {
         val texto: String
-            get() = "$total apps · $usuario de usuario · $sistema de sistema · ninguna excluida"
+            get() = "$total apps · $usuario de usuario · $sistema de sistema"
+
+        /**
+         * Si el teléfono devuelve muy pocas apps, es que Android está filtrando la
+         * lista (visibilidad de paquetes). Se dice, en vez de mostrar una lista corta
+         * como si fuera todo lo que hay instalado.
+         */
+        val sospechosamenteCorta: Boolean get() = total < 15
+        val aviso: String?
+            get() = if (sospechosamenteCorta)
+                "Sólo se ven $total apps. Android puede estar ocultando el resto: esta app " +
+                    "pide ver todas, pero algunos sistemas (Huawei/HarmonyOS, ROMs modificadas) " +
+                    "lo limitan. Lo que sigue NO es todo lo instalado."
+            else null
     }
 
     fun resumen(): Resumen {

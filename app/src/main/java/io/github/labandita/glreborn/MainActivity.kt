@@ -71,6 +71,9 @@ private fun App(
     var superActiva by remember { mutableStateOf<Supercomputadora?>(null) }
     var pantallaActual by remember { mutableStateOf<AjustesPantalla.Actual?>(null) }
     var congeladas by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var datosEquipo by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var pruebasCompat by remember { mutableStateOf<List<Compatibilidad.Prueba>>(emptyList()) }
+    var resumenCompat by remember { mutableStateOf("") }
 
     fun releer() {
         onRefrescar()
@@ -82,6 +85,9 @@ private fun App(
             apps.filter { director.apps().estaCongelada(it.paquete) }.map { it.paquete }.toSet()
         } else emptySet()
         lineasDiag = diagnostico.lineas()
+        datosEquipo = director.compatibilidad().datosBasicos()
+        pruebasCompat = director.compatibilidad().ejecutar()
+        resumenCompat = director.compatibilidad().resumen(pruebasCompat)
         limites = diagnostico.limites()
         if (estado == Director.Estado.SHIZUKU_SIN_PERMISO) onPedirShizuku()
     }
@@ -143,6 +149,13 @@ private fun App(
         onLimpiarCache = { p -> resultado = director.sistema().limpiarCache(p) },
         onDns = { host -> resultado = director.sistema().dnsPrivado(host) },
         onAnimaciones = { e -> resultado = director.sistema().escalasAnimacion(e) },
+        datosEquipo = datosEquipo,
+        pruebasCompat = pruebasCompat,
+        resumenCompat = resumenCompat,
+        onProbarCompatibilidad = {
+            pruebasCompat = director.compatibilidad().ejecutar()
+            resumenCompat = director.compatibilidad().resumen(pruebasCompat)
+        },
         onPerfil = { perfil = it },
         onAplicar = {
             val p = perfil

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
       CERO PERMISOS DE INTERNET A PROPÓSITO.
@@ -9,17 +10,46 @@
     -->
     <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
 
+    <!--
+      Android 11 (API 30) dejó de devolver la lista completa de apps instaladas.
+      Sin esto, la pantalla de apps mostraría cuatro cosas y la promesa de «sin
+      límite de apps» sería falsa en cualquier teléfono moderno — incluidos los
+      Huawei con HarmonyOS basado en Android 10/12. Lo detectó Lint, no una prueba
+      mía: las pruebas del núcleo corren en JVM y no ven el PackageManager.
+
+      Lint avisa de que se prefiera <queries> (y tiene razón en general). Aquí se
+      mantiene el permiso completo a propósito: la función de congelar apps sirve
+      sobre todo para las que NO tienen icono de lanzador — las que corren en
+      segundo plano y gastan batería. Con <queries> de lanzador no se verían, y la
+      pantalla de congelar quedaría inservible justo donde más falta hace.
+      El bloque <queries> de abajo se deja igualmente: ayuda en Android 11+ cuando
+      el permiso completo no esté concedido.
+    -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
+        android:dataExtractionRules="@xml/reglas_extraccion"
         android:theme="@style/TemaReborn">
 
         <activity
             android:name=".MainActivity"
-            android:exported="true"
-            android:label="@string/app_name">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

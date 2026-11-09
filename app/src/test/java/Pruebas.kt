@@ -225,6 +225,31 @@ fun main() {
     check("sin Shizuku no limpia caché", !sis.limpiarCache("com.example").ok)
     check("sin Shizuku no cambia animaciones", !sis.escalasAnimacion("0.5").ok)
 
+    println("\n17 · Compatibilidad: el resumen no adorna")
+    // La detección de Huawei y el resumen son lógica pura: se prueban sin teléfono.
+    // (ejecutar() y datosBasicos() tocan android.os.Build y sólo corren en el equipo;
+    //  eso se dice en PROBADO.md en vez de fingir que se probó aquí.)
+    val cp = Compatibilidad(io.github.labandita.glreborn.shizuku.Shell())
+    check("HUAWEI en mayúsculas se detecta", cp.esHuaweiDe("HUAWEI", "HUAWEI"))
+    check("honor se detecta", cp.esHuaweiDe("HONOR", "HONOR"))
+    check("Xiaomi no es Huawei", !cp.esHuaweiDe("Xiaomi", "Redmi"))
+    check("null no rompe la detección", !cp.esHuaweiDe(null, null))
+    check("HarmonyOS se detecta en el build", cp.esHarmonyDe("HUAWEI ALN-AL00 HarmonyOS/4.2"))
+    check("Android normal no es Harmony", !cp.esHarmonyDe("Pixel 8 Pro Build/AP1A"))
+
+    val pruebasFalsas = listOf(
+        Compatibilidad.Prueba("Shell de Shizuku", Compatibilidad.Prueba.Estado.FALLA, "sin gestor"),
+        Compatibilidad.Prueba("Resolución (wm)", Compatibilidad.Prueba.Estado.PASA, "ok"),
+        Compatibilidad.Prueba("Congelar apps (pm disable)", Compatibilidad.Prueba.Estado.NO_APLICA, "se salta"),
+    )
+    val resumenCp = cp.resumen(pruebasFalsas)
+    check("el resumen cuenta 1 pasa, 1 falla, 1 sin probar",
+        resumenCp.contains("1 pasan") && resumenCp.contains("1 fallan") && resumenCp.contains("1 sin probar"),
+        resumenCp)
+    check("el resumen avisa de que lo que falla no funcionará",
+        resumenCp.contains("no funcionarán"), resumenCp)
+    check("no dice «compatible» a secas", !resumenCp.equals("compatible", true), resumenCp)
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")
