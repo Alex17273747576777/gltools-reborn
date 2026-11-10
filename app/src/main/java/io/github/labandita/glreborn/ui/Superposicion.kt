@@ -13,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontFamily
@@ -55,13 +54,8 @@ fun PantallaSuperposicion(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(
-                    Brush.linearGradient(
-                        listOf(color.copy(alpha = 0.26f), color.copy(alpha = 0.07f))
-                    )
-                )
-                .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(Cristal.superficie)
                 .padding(15.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -95,16 +89,16 @@ fun PantallaSuperposicion(
 
         Spacer(Modifier.height(10.dp))
         if (!tienePermiso) {
-            BotonHome("Dar permiso de superposición", Cristal.ambar, Modifier.fillMaxWidth()) {
+            BotonPlano("Dar permiso de superposición", Cristal.ambar, Modifier.fillMaxWidth()) {
                 onPedirPermiso()
             }
         } else if (activo) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BotonHome("Mover el punto", Cristal.vidrioFuerte, Modifier.weight(1f)) { onMover() }
-                BotonHome("Quitar", Cristal.rojo, Modifier.weight(1f)) { onDesactivar() }
+                BotonPlano("Mover el punto", Cristal.vidrioFuerte, Modifier.weight(1f)) { onMover() }
+                BotonPlano("Quitar", Cristal.rojo, Modifier.weight(1f)) { onDesactivar() }
             }
         } else {
-            BotonHome("Encender encima del juego", Cristal.verde, Modifier.fillMaxWidth()) {
+            BotonPlano("Encender encima del juego", Cristal.verde, Modifier.fillMaxWidth()) {
                 onActivar()
             }
         }
@@ -118,11 +112,7 @@ fun PantallaSuperposicion(
                 .fillMaxWidth()
                 .height(150.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFF15192B), Color(0xFF0C0E17))
-                    )
-                )
+                .background(Cristal.fondoAbajo)
                 .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(20.dp)),
             contentAlignment = Alignment.Center,
         ) {

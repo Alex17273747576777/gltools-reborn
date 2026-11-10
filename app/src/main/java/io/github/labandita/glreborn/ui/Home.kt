@@ -1,8 +1,8 @@
 package io.github.labandita.glreborn.ui
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,31 +11,39 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.labandita.glreborn.core.Datos
 import io.github.labandita.glreborn.core.Modo
 import io.github.labandita.glreborn.core.PerfilDispositivo
-import io.github.labandita.glreborn.core.Rendimiento
+import io.github.labandita.glreborn.core.Sonda
 
 /**
- * Home: el resumen, y lo primero que se abre.
+ * Home, reescrita desde cero en la 1.8.1.
  *
- * El GLTools original abre en un Home con un cartel verde de «Rooted mode», dos tiles
- * grandes (Add game · Device Info) y la tarjeta del proyecto. Esta pantalla tiene la
- * misma arquitectura —estado arriba, dos tiles de acción, tarjeta de identidad— y el
- * mismo peso visual, pero lo que dice el cartel son datos medidos, y los tiles llevan a
- * algo que se puede hacer en ESTE teléfono.
+ * Lo que había: nueve cajas del mismo tamaño, con el mismo radio, el mismo borde y el mismo
+ * vidrio, cada una con un degradado. Al mirarla no había un orden: el ojo no sabía dónde
+ * empezar, y eso es exactamente lo que hace que una app parezca una página web.
+ *
+ * Lo que hay ahora, y por qué:
+ *
+ *  1. **El estado manda.** Un bloque arriba con el dato más importante del producto —¿puedo
+ *     escribir o no?— resuelto con un color que significa algo, sin caja flotante.
+ *  2. **Un número grande.** La identidad que está puesta ahora (o «ninguna») se lee de un
+ *     vistazo, en 26 sp, no en una fila de texto más.
+ *  3. **Filas densas, no cajas.** Los datos del teléfono son filas separadas por una línea de
+ *     1 dp, como en un panel de sistema. Diez cajas con borde eran diez veces el mismo peso.
+ *  4. **Dos acciones, jerarquía clara.** Una primaria y una secundaria. No tres iguales.
+ *  5. **Cero degradados.** El color aparece sólo donde comunica.
  */
 @Composable
 fun PantallaHome(
@@ -45,7 +53,7 @@ fun PantallaHome(
     perfilActivo: PerfilDispositivo?,
     modo: Modo,
     actual: Map<String, String>,
-    datosSonda: io.github.labandita.glreborn.core.Sonda.Datos?,
+    datosSonda: Sonda.Datos?,
     resumenCompat: String,
     apps: Int,
     congeladas: Int,
@@ -58,75 +66,73 @@ fun PantallaHome(
     onAplicar: () -> Unit,
     onRestaurar: () -> Unit,
     onModo: () -> Unit,
+    falloLectura: String? = null,
+    onDescartarFalloLectura: () -> Unit = {},
 ) {
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(18.dp, 10.dp, 18.dp, 120.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 96.dp),
     ) {
-        // ── El cartel grande de estado: lo primero, como en el original.
-        item { BannerGrande(banner, puede) }
-
-        // ── Avisos: sólo si hay algo que decir. Sin relleno.
-        if (avisos.isNotEmpty()) {
-            item { Etiqueta("ANTES DE NADA") }
-            items(avisos) { a -> TarjetaAviso(a) }
+        // ── 1. El estado. Sin caja: una barra de color a la izquierda y el texto sobre el fondo.
+        item {
+            EstadoCabecera(banner, puede)
         }
 
-        // ── El perfil activo o la invitación a elegir uno.
-        item { Etiqueta("PERFIL EN USO") }
-        item {
-            if (perfilActivo == null) {
-                Column(Modifier.fillMaxWidth().vidrio(20).padding(16.dp)) {
-                    Text("Ninguno todavía", fontSize = 16.sp, color = Cristal.texto,
-                        fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Elige uno del catálogo o genera uno con lo que tu teléfono declara " +
-                            "de verdad.",
-                        fontSize = 12.sp, lineHeight = 18.sp, color = Cristal.textoSuave,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BotonHome("Ver catálogo", Cristal.violeta, Modifier.weight(1f)) {
-                            onIrA(Destino.PERFILES, Pestana.CATALOGO)
-                        }
-                        BotonHome("Generar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
-                            onIrA(Destino.PERFILES, Pestana.GENERAR)
-                        }
+        // ── 1b. Si alguna lectura del teléfono falló, se dice. Antes se la tragaba.
+        if (falloLectura != null) {
+            item {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Cristal.superficie)
+                        .clickable { onDescartarFalloLectura() }
+                        .padding(horizontal = 13.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.width(3.dp).height(26.dp).background(Cristal.ambar, RoundedCornerShape(2.dp)))
+                    Spacer(Modifier.width(11.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "No pude leer todo el teléfono",
+                            fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Cristal.texto,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "$falloLectura · toca para ocultar",
+                            fontSize = 11.sp, lineHeight = 15.sp, color = Cristal.textoTenue,
+                        )
                     }
                 }
+            }
+        }
+
+        // ── 2. Avisos: filas, no tarjetas. Sólo si hay algo que avisar.
+        if (avisos.isNotEmpty()) {
+            item { Separador(20.dp) }
+            items(avisos) { a -> FilaAviso(a) }
+        }
+
+        // ── 3. La identidad en uso: el número grande.
+        item { Separador(24.dp) }
+        item { Rotulo("IDENTIDAD EN USO") }
+        item { Separador(8.dp) }
+        item {
+            if (perfilActivo == null) {
+                SinPerfil(onIrA)
             } else {
-                TarjetaPerfilActivo(perfilActivo, onAplicar, onRestaurar) {
+                PerfilEnUso(perfilActivo, onAplicar, onRestaurar) {
                     onIrA(Destino.PERFILES, Pestana.CATALOGO)
                 }
             }
         }
 
-        // ── Los dos tiles grandes, como «Add game» y «Device Info» del original.
+        // ── 4. El teléfono, en filas densas.
+        item { Separador(28.dp) }
+        item { Rotulo("EL TELÉFONO DICE") }
+        item { Separador(4.dp) }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TileGrande(
-                    titulo = "Herramientas",
-                    subtitulo = "$acciones acciones sin root",
-                    color = Cristal.violeta,
-                    modifier = Modifier.weight(1f),
-                    icono = { c -> Iconos.Rayo(tamano = 26.dp, color = c) },
-                ) { onIrA(Destino.HERRAMIENTAS, Pestana.RENDIMIENTO) }
-                TileGrande(
-                    titulo = "Tu teléfono",
-                    subtitulo = datosSonda?.resumen?.take(40) ?: "leer propiedades",
-                    color = Cristal.cian,
-                    modifier = Modifier.weight(1f),
-                    icono = { c -> Iconos.BaseDeDatos(tamano = 26.dp, color = c) },
-                ) { onIrA(Destino.AYUDA, Pestana.DIAGNOSTICO) }
-            }
-        }
-
-        // ── Lo que dice el teléfono ahora, en cuatro datos.
-        item { Etiqueta("EL TELÉFONO DICE AHORA") }
-        item {
-            Column(Modifier.fillMaxWidth().vidrio(20).padding(16.dp)) {
+            Column(Modifier.fillMaxWidth()) {
                 val claves = listOf(
                     "ro.product.model" to "Modelo",
                     "ro.product.brand" to "Marca",
@@ -134,135 +140,155 @@ fun PantallaHome(
                     "ro.opengles.version" to "OpenGL ES",
                 )
                 claves.forEachIndexed { i, (clave, etiqueta) ->
-                    if (i > 0) {
-                        Box(Modifier.fillMaxWidth().height(1.dp)
-                            .background(Cristal.bordeLuz))
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 9.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(etiqueta, fontSize = 12.sp, color = Cristal.textoSuave)
-                        Text(
-                            actual[clave]?.ifBlank { "—" } ?: "—",
-                            fontSize = 12.sp, color = Cristal.texto,
-                            fontFamily = FontFamily.Monospace,
-                        )
-                    }
+                    if (i > 0) Linea()
+                    FilaDato(etiqueta, actual[clave]?.ifBlank { "sin declarar" } ?: "sin declarar")
                 }
             }
         }
 
-        // ── Los números de la app: datos reales que lleva dentro.
-        item { Etiqueta("LO QUE HAY DENTRO") }
+        // ── 5. Accesos: dos, no seis. Y con peso distinto.
+        item { Separador(28.dp) }
+        item { Rotulo("ATAJOS") }
+        item { Separador(8.dp) }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Cifra("$apps", "apps", Cristal.violeta, Modifier.weight(1f))
-                Cifra("$congeladas", "congeladas", Cristal.cian, Modifier.weight(1f))
-                Cifra("$fichas", "fichas", Cristal.rosa, Modifier.weight(1f))
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Cifra("$ediciones", "ediciones", Cristal.violeta, Modifier.weight(1f))
-                Cifra("$sistemas", "sistemas", Cristal.cian, Modifier.weight(1f))
-                Cifra("$acciones", "acciones", Cristal.verde, Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Acceso(
+                    titulo = "Herramientas",
+                    detalle = "$acciones acciones sin root",
+                    color = Cristal.marca,
+                    modifier = Modifier.weight(1f),
+                ) { onIrA(Destino.HERRAMIENTAS, Pestana.RENDIMIENTO) }
+                Acceso(
+                    titulo = "Punto de mira",
+                    detalle = "encima del juego",
+                    color = Cristal.verde,
+                    modifier = Modifier.weight(1f),
+                ) { onIrA(Destino.HERRAMIENTAS, Pestana.SUPERPOSICION) }
             }
         }
 
-        // ── La tarjeta de identidad, en el sitio donde el original pone la suya.
-        item { Spacer(Modifier.height(4.dp)) }
-        item { TarjetaIdentidad(version, modo, onModo, resumenCompat) }
+        // ── 6. Cifras: UNA fila de cuatro, en texto, no ocho cajas con degradado.
+        item { Separador(28.dp) }
+        item { Rotulo("DENTRO DEL APK") }
+        item { Separador(8.dp) }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Cifra("${apps}", "apps", Modifier.weight(1f))
+                Cifra("${fichas}", "fichas", Modifier.weight(1f))
+                Cifra("${ediciones}", "ediciones", Modifier.weight(1f))
+                Cifra("${acciones}", "acciones", Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "$congeladas apps congeladas · $sistemas sistemas en el TOP500 · " +
+                    "versión $version",
+                fontSize = 10.sp, lineHeight = 15.sp, color = Cristal.textoTenue,
+            )
+        }
+
+        // ── 7. Pie: una línea, sin caja de tarjeta.
+        item { Separador(28.dp) }
+        item {
+            Row(
+                Modifier.fillMaxWidth().clickable { onModo() },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (modo == Modo.SEGURO) "Modo seguro" else "Modo experto",
+                    fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                    color = if (modo == Modo.SEGURO) Cristal.verde else Cristal.ambar,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (modo == Modo.SEGURO) "· sólo identidad" else "· toca API, huella y kernel",
+                    fontSize = 11.sp, color = Cristal.textoTenue,
+                )
+                Spacer(Modifier.weight(1f))
+                Text("cambiar", fontSize = 11.sp, color = Cristal.marca)
+            }
+            if (resumenCompat.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(resumenCompat, fontSize = 10.sp, lineHeight = 15.sp,
+                    color = Cristal.textoTenue)
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "GLTools Reborn · código abierto · sin cuentas ni telemetría",
+                fontSize = 10.sp, color = Cristal.textoTenue,
+            )
+        }
     }
 }
 
+/** El estado, como titular. La barra de color a la izquierda es el único acento. */
 @Composable
-private fun BannerGrande(b: Banner, puede: String) {
+private fun EstadoCabecera(b: Banner, puede: String) {
     val color = when (b.tono) {
         Banner.Tono.BIEN -> Cristal.verde
         Banner.Tono.AVISO -> Cristal.ambar
         Banner.Tono.MAL -> Cristal.rojo
     }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(color.copy(alpha = 0.28f), color.copy(alpha = 0.10f))
-                )
-            )
-            .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(24.dp))
-            .padding(18.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(34.dp).clip(CircleShape).background(color.copy(alpha = 0.9f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                when (b.tono) {
-                    Banner.Tono.BIEN -> Iconos.Visto(tamano = 18.dp, color = Cristal.fondoArriba)
-                    else -> Box(
-                        Modifier.size(4.dp).clip(CircleShape).background(Cristal.fondoArriba)
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
+    Row(Modifier.fillMaxWidth()) {
+        Box(
+            Modifier.width(3.dp).height(72.dp).clip(RoundedCornerShape(2.dp)).background(color),
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
             Text(
-                b.titulo,
-                fontSize = 19.sp, color = Cristal.texto, fontWeight = FontWeight.SemiBold,
+                b.titulo.uppercase(),
+                fontSize = 10.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold,
+                color = color,
             )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                b.detalle,
+                fontSize = 12.5.sp, lineHeight = 18.sp, color = Cristal.texto,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(puede, fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.textoSuave)
         }
-        Spacer(Modifier.height(10.dp))
-        Text(b.detalle, fontSize = 12.sp, lineHeight = 18.sp, color = Cristal.texto.copy(alpha = 0.85f))
-        Spacer(Modifier.height(6.dp))
-        Text(puede, fontSize = 11.sp, lineHeight = 16.sp, color = color, fontWeight = FontWeight.Medium)
     }
 }
 
 @Composable
-private fun TarjetaAviso(a: Estado.Par) {
+private fun FilaAviso(a: Estado.Par) {
     val color = when (a.tono) {
         Banner.Tono.BIEN -> Cristal.verde
         Banner.Tono.AVISO -> Cristal.ambar
         Banner.Tono.MAL -> Cristal.rojo
     }
-    Row(
-        Modifier.fillMaxWidth().vidrio(18).padding(14.dp),
-    ) {
-        Box(
-            Modifier.width(3.dp).height(38.dp).clip(RoundedCornerShape(2.dp))
-                .background(color),
-        )
-        Spacer(Modifier.width(12.dp))
+    Row(Modifier.fillMaxWidth().padding(start = 17.dp, top = 10.dp)) {
+        Box(Modifier.padding(top = 5.dp).size(5.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(10.dp))
         Column {
-            Text(a.titulo, fontSize = 13.sp, color = Cristal.texto, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(3.dp))
+            Text(a.titulo, fontSize = 12.5.sp, color = Cristal.texto,
+                fontWeight = FontWeight.Medium)
             Text(a.detalle, fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.textoSuave)
         }
     }
 }
 
+/** El perfil activo, con el nombre grande. Es el número de esta pantalla. */
 @Composable
-private fun TarjetaPerfilActivo(
+private fun PerfilEnUso(
     p: PerfilDispositivo,
     onAplicar: () -> Unit,
     onRestaurar: () -> Unit,
     onCambiar: () -> Unit,
 ) {
-    Column(
-        Modifier.fillMaxWidth().vidrio(20).padding(16.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(p.nombre, fontSize = 17.sp, color = Cristal.texto,
-                    fontWeight = FontWeight.SemiBold, maxLines = 2)
-                Text(
-                    "${p.fabricante} · ${p.hardware.ifBlank { p.board.ifBlank { "—" } }}",
-                    fontSize = 11.sp, color = Cristal.textoSuave,
-                )
-            }
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            p.nombre,
+            fontSize = 26.sp, lineHeight = 31.sp, color = Cristal.texto,
+            fontWeight = FontWeight.Light, maxLines = 2,
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "${p.fabricante} · ${p.gpu.ifBlank { "GPU sin declarar" }}",
+                fontSize = 11.sp, color = Cristal.textoSuave, maxLines = 1,
+            )
+            Spacer(Modifier.width(8.dp))
             Text(
                 when (p.confianza) {
                     PerfilDispositivo.Confianza.VERIFICADO -> "VERIFICADO"
@@ -277,108 +303,105 @@ private fun TarjetaPerfilActivo(
                 },
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            BotonHome("Aplicar", Cristal.verde, Modifier.weight(1f)) { onAplicar() }
-            BotonHome("Restaurar", Cristal.vidrioFuerte, Modifier.weight(1f)) { onRestaurar() }
-            BotonHome("Cambiar", Cristal.vidrioFuerte, Modifier.weight(1f)) { onCambiar() }
+            BotonPlano("Aplicar", Cristal.verde, Modifier.weight(1.4f)) { onAplicar() }
+            BotonPlano("Restaurar", Cristal.superficieMasAlta, Modifier.weight(1f)) { onRestaurar() }
+            BotonPlano("Cambiar", Cristal.superficieMasAlta, Modifier.weight(1f)) { onCambiar() }
         }
     }
 }
 
 @Composable
-private fun TileGrande(
+private fun SinPerfil(onIrA: (Destino, Pestana?) -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            "Ninguno",
+            fontSize = 26.sp, color = Cristal.textoTenue, fontWeight = FontWeight.Light,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Elige un perfil del catálogo o genera uno con lo que tu teléfono declara de verdad.",
+            fontSize = 11.5.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
+        )
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BotonPlano("Ver catálogo", Cristal.marca, Modifier.weight(1f)) {
+                onIrA(Destino.PERFILES, Pestana.CATALOGO)
+            }
+            BotonPlano("Generar uno", Cristal.superficieMasAlta, Modifier.weight(1f)) {
+                onIrA(Destino.PERFILES, Pestana.GENERAR)
+            }
+        }
+    }
+}
+
+/** Una fila de dato: rótulo a la izquierda, valor monoespaciado a la derecha. */
+@Composable
+private fun FilaDato(etiqueta: String, valor: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 9.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(etiqueta, fontSize = 11.5.sp, color = Cristal.textoSuave)
+        Text(
+            valor,
+            fontSize = 11.5.sp, color = Cristal.texto,
+            fontFamily = FontFamily.Monospace, maxLines = 1,
+        )
+    }
+}
+
+/** Atajo: título fuerte y detalle tenue, sin caja con degradado. */
+@Composable
+private fun Acceso(
     titulo: String,
-    subtitulo: String,
+    detalle: String,
     color: Color,
     modifier: Modifier = Modifier,
-    icono: @Composable (Color) -> Unit,
     onClick: () -> Unit,
 ) {
     Column(
         modifier
-            .height(126.dp)
-            .clip(RoundedCornerShape(22.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(color.copy(alpha = 0.30f), color.copy(alpha = 0.08f))
-                )
-            )
-            .border(1.dp, color.copy(alpha = 0.36f), RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .background(Cristal.superficie)
             .clickable { onClick() }
             .padding(14.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        icono(color)
-        Column {
-            Text(titulo, fontSize = 15.sp, color = Cristal.texto, fontWeight = FontWeight.SemiBold)
-            Text(subtitulo, fontSize = 10.sp, lineHeight = 14.sp, color = Cristal.textoSuave,
-                maxLines = 2)
-        }
+        Box(Modifier.width(18.dp).height(2.dp).background(color))
+        Spacer(Modifier.height(10.dp))
+        Text(titulo, fontSize = 13.sp, color = Cristal.texto, fontWeight = FontWeight.SemiBold)
+        Text(detalle, fontSize = 10.sp, lineHeight = 14.sp, color = Cristal.textoTenue, maxLines = 2)
+    }
+}
+
+/** Cifra: número grande, etiqueta pequeña. Sin caja. */
+@Composable
+private fun Cifra(valor: String, etiqueta: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(valor, fontSize = 20.sp, color = Cristal.texto, fontWeight = FontWeight.Light)
+        Text(etiqueta, fontSize = 9.sp, letterSpacing = 0.6.sp, color = Cristal.textoTenue)
     }
 }
 
 @Composable
-private fun Cifra(valor: String, etiqueta: String, color: Color, modifier: Modifier = Modifier) {
-    Column(
-        modifier.clip(RoundedCornerShape(18.dp)).background(Cristal.vidrio)
-            .padding(vertical = 13.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(valor, fontSize = 22.sp, color = color, fontWeight = FontWeight.Bold)
-        Text(etiqueta, fontSize = 9.sp, letterSpacing = 0.6.sp, color = Cristal.textoSuave)
-    }
+internal fun Rotulo(t: String) {
+    Text(
+        t, fontSize = 9.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.Bold,
+        color = Cristal.textoTenue,
+    )
 }
 
 @Composable
-private fun TarjetaIdentidad(
-    version: String,
-    modo: Modo,
-    onModo: () -> Unit,
-    resumenCompat: String,
-) {
-    Column(Modifier.fillMaxWidth().vidrio(22).padding(17.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(44.dp).clip(RoundedCornerShape(14.dp))
-                    .background(
-                        Brush.linearGradient(listOf(Cristal.violeta, Cristal.cian))
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Iconos.Espadas(tamano = 24.dp, color = Cristal.fondoArriba)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("GLTools Reborn", fontSize = 16.sp, color = Cristal.texto,
-                    fontWeight = FontWeight.SemiBold)
-                Text("Perfiles de dispositivo · sin servidores · $version",
-                    fontSize = 10.sp, color = Cristal.textoSuave)
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "Código abierto, Apache 2.0. Sin cuenta, sin telemetría y sin nada de pago: " +
-                "no hay servidor al que enviar nada.",
-            fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.textoSuave,
-        )
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            BotonHome(
-                if (modo == Modo.SEGURO) "Modo: seguro" else "Modo: experto",
-                if (modo == Modo.SEGURO) Cristal.vidrioFuerte else Cristal.ambar,
-                Modifier.weight(1f),
-            ) { onModo() }
-        }
-        if (resumenCompat.isNotBlank()) {
-            Spacer(Modifier.height(8.dp))
-            Text(resumenCompat, fontSize = 10.sp, lineHeight = 15.sp, color = Cristal.textoSuave)
-        }
-    }
-}
+private fun Separador(alto: androidx.compose.ui.unit.Dp) = Spacer(Modifier.height(alto))
 
 @Composable
-internal fun BotonHome(
+private fun Linea() = Box(Modifier.fillMaxWidth().height(1.dp).background(Cristal.bordeLuz))
+
+/** Botón con dos tratamientos: primario (color) y secundario (superficie). */
+@Composable
+internal fun BotonPlano(
     texto: String,
     color: Color,
     modifier: Modifier = Modifier,
@@ -386,18 +409,59 @@ internal fun BotonHome(
 ) {
     Box(
         modifier
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(color)
             .clickable { onClick() }
-            .padding(vertical = 12.dp),
+            .padding(vertical = 11.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             texto,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            color = if (color == Cristal.vidrioFuerte) Cristal.texto else Cristal.fondoArriba,
+            color = if (color == Cristal.superficieMasAlta || color == Cristal.superficie)
+                Cristal.texto else Cristal.fondoAbajo,
             maxLines = 1,
         )
+    }
+}
+
+/**
+ * Fila que se pulsa entera (el patrón de los ajustes de Android): título, explicación corta
+ * y, a la derecha, lo que va a pasar. Sin recuadro alrededor de cada cosa.
+ */
+@Composable
+internal fun BotonFila(
+    titulo: String,
+    detalle: String,
+    modifier: Modifier = Modifier,
+    acento: Color = Cristal.marca,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(3.dp).height(30.dp).background(acento, RoundedCornerShape(2.dp)))
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                titulo,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = Cristal.texto,
+                maxLines = 1,
+            )
+            if (detalle.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(detalle, fontSize = 11.sp, color = Cristal.textoTenue, maxLines = 2)
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Iconos.Flecha(Modifier, tamano = 15.dp, color = Cristal.textoTenue)
     }
 }

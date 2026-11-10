@@ -15,6 +15,7 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
 import io.github.labandita.glreborn.R
+import io.github.labandita.glreborn.RegistroFallos
 import io.github.labandita.glreborn.core.AjustesSuperposicion
 
 /**
@@ -68,9 +69,18 @@ class ServicioSuperposicion : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
-        startForeground(ID_NOTIFICACION, notificacion())
-        if (vista == null) montarVentana()
-        aplicarAjustes(AjustesSuperposicion.leer(this))
+        // Todo dentro de red: una excepción aquí NO cierra la app (el servicio corre en el
+        // mismo proceso), pero sí dejaría la notificación puesta sin nada que dibujar.
+        val montado = runCatching {
+            startForeground(ID_NOTIFICACION, notificacion())
+            if (vista == null) montarVentana()
+            aplicarAjustes(AjustesSuperposicion.leer(this))
+        }
+        if (montado.isFailure) {
+            runCatching { RegistroFallos.guardar(this, montado.exceptionOrNull()!!, "servicio: montar") }
+            runCatching { stopSelf() }
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
 

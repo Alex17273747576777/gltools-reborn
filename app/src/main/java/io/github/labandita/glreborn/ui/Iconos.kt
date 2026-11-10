@@ -222,4 +222,18 @@ object Iconos {
             drawPath(p, color, style = Stroke(width = grosor, cap = StrokeCap.Round,
                 join = androidx.compose.ui.graphics.StrokeJoin.Round))
         }
+
+    /** Flecha de «esto lleva a otro sitio». Trazo, no carácter. */
+    @Composable
+    fun Flecha(modifier: Modifier = Modifier, tamano: Dp = 22.dp, color: Color = Cristal.textoTenue) =
+        Canvas(modifier.size(tamano)) {
+            val a = size.minDimension
+            val trazo = Stroke(width = a * 0.09f, cap = StrokeCap.Round)
+            val x0 = a * 0.34f
+            val x1 = a * 0.66f
+            val y = a * 0.5f
+            drawLine(color, Offset(x0, y), Offset(x1, y), strokeWidth = trazo.width, cap = StrokeCap.Round)
+            drawLine(color, Offset(x1 - a * 0.15f, y - a * 0.15f), Offset(x1, y), strokeWidth = trazo.width, cap = StrokeCap.Round)
+            drawLine(color, Offset(x1 - a * 0.15f, y + a * 0.15f), Offset(x1, y), strokeWidth = trazo.width, cap = StrokeCap.Round)
+        }
 }

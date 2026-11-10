@@ -12,7 +12,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -103,7 +102,8 @@ fun PantallaConfigurar(
             if (visibles.isEmpty()) {
                 run {
                     Column(
-                        Modifier.fillMaxWidth().vidrio(18).padding(20.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Cristal.superficie)
+            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(18.dp)).padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text("Nada que configurar aquí", fontSize = 14.sp, color = Cristal.texto,
@@ -180,7 +180,7 @@ private fun EtiquetaConsecuencia(e: FilaConfig.Etiqueta) {
     val (texto, color) = when (e) {
         FilaConfig.Etiqueta.RENDIMIENTO -> "Rendimiento" to Cristal.verde
         FilaConfig.Etiqueta.COMPATIBILIDAD -> "Compatibilidad" to Cristal.cian
-        FilaConfig.Etiqueta.CALIDAD -> "Calidad" to Cristal.violeta
+        FilaConfig.Etiqueta.CALIDAD -> "Calidad" to Cristal.marca
         FilaConfig.Etiqueta.MEMORIA -> "Memoria" to Cristal.ambar
         FilaConfig.Etiqueta.PELIGRO -> "Con riesgo" to Cristal.rojo
         FilaConfig.Etiqueta.NECESITA_ROOT -> "Necesita root" to Cristal.rojo
@@ -224,13 +224,8 @@ private fun TarjetaPlantilla(
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(Cristal.violeta.copy(alpha = 0.22f), Cristal.cian.copy(alpha = 0.08f))
-                )
-            )
-            .border(1.dp, Cristal.violeta.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .background(Cristal.superficie)
             .padding(16.dp),
     ) {
         if (perfil == null) {
@@ -244,7 +239,7 @@ private fun TarjetaPlantilla(
             )
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BotonPlano("Buscar una", Cristal.violeta, Modifier.weight(1f)) { onIrAPerfiles() }
+                BotonPlano("Buscar una", Cristal.marca, Modifier.weight(1f)) { onIrAPerfiles() }
                 BotonPlano("Generar", Cristal.vidrioFuerte, Modifier.weight(1f)) { onIrAGenerar() }
             }
         } else {
@@ -283,24 +278,6 @@ private fun TarjetaPlantilla(
                 BotonPlano("Generar otro", Cristal.vidrioFuerte, Modifier.weight(1f)) { onIrAGenerar() }
             }
         }
-    }
-}
-
-@Composable
-private fun BotonPlano(
-    texto: String,
-    color: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier.clip(RoundedCornerShape(13.dp)).background(color).clickable { onClick() }
-            .padding(vertical = 11.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(texto, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold,
-            color = if (color == Cristal.vidrioFuerte) Cristal.texto else Cristal.fondoArriba,
-            maxLines = 1)
     }
 }
 

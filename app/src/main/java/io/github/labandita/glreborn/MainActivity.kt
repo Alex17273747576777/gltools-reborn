@@ -38,6 +38,17 @@ class MainActivity : ComponentActivity() {
     private lateinit var inventario: Inventario
     private lateinit var diagnostico: Diagnostico
 
+    // El informe de un cierre anterior, si lo hay. Se enseña antes que nada.
+    private var informeFallo: String? = null
+
+    // Si una lectura del teléfono falla, se dice en pantalla. No puede quedarse en un log.
+    private val falloLectura = androidx.compose.runtime.mutableStateOf<String?>(null)
+
+    /** El aviso de lectura se descarta con la última palabra: cadena vacía quiere decir «nada». */
+    private fun anotarFalloLectura(texto: String) {
+        falloLectura.value = texto.ifBlank { null }
+    }
+
     private val pedirPermiso = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
@@ -58,14 +69,40 @@ class MainActivity : ComponentActivity() {
         }
         var error = arranque.exceptionOrNull()?.let { "${it.javaClass.simpleName}: ${it.message}" }
 
+        // Si la app se cerró la última vez, aquí se enseña el parte en vez de fingir que nada.
+        val pedidoMostrarFallo = intent?.getBooleanExtra(RebornApp.EXTRA_MOSTRAR_FALLO, false) == true
+        informeFallo = if (pedidoMostrarFallo) RegistroFallos.leer(this) else null
+        if (pedidoMostrarFallo) intent?.removeExtra(RebornApp.EXTRA_MOSTRAR_FALLO)
+
         runCatching { pedirNotificaciones() }
 
         setContent {
             TemaReborn {
-                if (error == null) {
-                    App(director, inventario, diagnostico, ::refrescar, ::pedirPermisoShizuku) {
-                        error = it
-                    }
+                if (informeFallo != null) {
+                    io.github.labandita.glreborn.ui.PantallaFallo(
+                        informe = informeFallo.orEmpty(),
+                        onCopiar = { texto ->
+                            val portapapeles = getSystemService(android.content.ClipboardManager::class.java)
+                            portapapeles?.setPrimaryClip(
+                                android.content.ClipData.newPlainText("fallo", texto)
+                            )
+                            android.widget.Toast.makeText(
+                                this@MainActivity, "Informe copiado",
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        },
+                        onContinuar = {
+                            RegistroFallos.borrar(this@MainActivity)
+                            informeFallo = null
+                        },
+                    )
+                } else if (error == null) {
+                    App(
+                        director, inventario, diagnostico, ::refrescar, ::pedirPermisoShizuku,
+                        onFallo = { error = it },
+                        onFalloLectura = ::anotarFalloLectura,
+                        falloLectura = falloLectura.value,
+                    )
                 } else {
                     io.github.labandita.glreborn.ui.PantallaArrancando(error)
                 }
@@ -123,7 +160,11 @@ private fun App(
     onRefrescar: () -> Unit,
     onPedirShizuku: () -> Unit,
     onFallo: (String) -> Unit = {},
+    onFalloLectura: (String) -> Unit = {},
+    falloLectura: String? = null,
 ) {
+    // Dentro de la composición el aviso se anota por la lambda que llega de la Activity.
+    val anotarFalloLectura: (String) -> Unit = onFalloLectura
     var estado by remember { mutableStateOf(Director.Estado.SIN_VIA) }
     var perfil by remember { mutableStateOf<PerfilDispositivo?>(null) }
     var resultado by remember { mutableStateOf<Resultado?>(null) }
@@ -183,25 +224,71 @@ private fun App(
      * Ahora: lo de Android (instantáneo) se lee aquí, y lo de la shell va aparte, con
      * una sola consulta y sin bloquear la pantalla.
      */
+    /** Un fallo que no debe cerrar la app, pero que no se puede perder. */
+    fun registrarFalloSilencioso(etiqueta: String, t: Throwable) {
+        anotarFalloLectura("$etiqueta · ${t.javaClass.simpleName}: ${t.message}")
+        runCatching { RegistroFallos.guardar(contexto, t, "lectura: $etiqueta") }
+    }
+
+    fun <T> proteger(etiqueta: String, bloque: () -> T): T? =
+        try {
+            bloque()
+        } catch (t: Throwable) {
+            registrarFalloSilencioso(etiqueta, t)
+            null
+        }
+
+    fun <T> protegerCon(etiqueta: String, porDefecto: T, bloque: () -> T): T =
+        proteger(etiqueta, bloque) ?: porDefecto
+
+    fun protegerLectura(etiqueta: String, bloque: () -> Unit) {
+        try {
+            bloque()
+        } catch (t: Throwable) {
+            registrarFalloSilencioso(etiqueta, t)
+        }
+    }
+
+
+    /**
+     * Relee el estado del teléfono.
+     *
+     * CADA lectura va protegida por separado, y esto no es paranoia: antes había tres sentencias
+     * sin protección (`diagnostico.lineas()`, `diagnostico.limites()`, `datosBasicos()` y
+     * `aplicado().fichas()`). Una sola excepción en cualquiera de ellas —y en un HIOS con
+     * Shizuku a medias las hay— se lanzaba dentro de un `LaunchedEffect` y **cerraba la app**.
+     * Un fallo leyendo el diagnóstico no puede impedir que la pantalla principal se dibuje.
+     */
     fun releer() {
-        onRefrescar()
-        estado = director.estado()
-        // Un fallo al leer la lista de apps no puede impedir que la app arranque.
-        apps = try { inventario.todas() } catch (t: Throwable) { emptyList() }
-        lineasDiag = diagnostico.lineas()
-        limites = diagnostico.limites()
-        datosEquipo = director.compatibilidad().datosBasicos()
-        fichas = director.aplicado().fichas(apps.associate { it.paquete to it.nombre })
-        biblioteca = try { director.biblioteca().leer() } catch (t: Throwable) { emptyList() }
-        if (estado == Director.Estado.SHIZUKU_SIN_PERMISO) onPedirShizuku()
+        protegerLectura("refrescar") { onRefrescar() }
+        estado = protegerCon("estado", Director.Estado.SIN_VIA) { director.estado() }
+        apps = proteger("apps") { inventario.todas() } ?: emptyList()
+        lineasDiag = proteger("diagnóstico") { diagnostico.lineas() } ?: emptyList()
+        limites = proteger("límites") { diagnostico.limites() } ?: emptyList()
+        datosEquipo = proteger("datos básicos") { director.compatibilidad().datosBasicos() }
+            ?: emptyList()
+        fichas = proteger("aplicado") {
+            director.aplicado().fichas(apps.associate { it.paquete to it.nombre })
+        } ?: emptyList()
+        biblioteca = proteger("biblioteca") { director.biblioteca().leer() } ?: emptyList()
+        if (estado == Director.Estado.SHIZUKU_SIN_PERMISO) {
+            protegerLectura("pedir permiso") { onPedirShizuku() }
+        }
     }
 
     /** Lo que necesita la shell. Corre en otro hilo y jamás tumba la pantalla. */
     suspend fun releerShell() = withContext(Dispatchers.IO) {
-        val congeladasLeidas = director.conShell { director.apps().congeladas() } ?: emptySet()
-        val pantalla = director.conShell { director.pantalla().leer() }
-        val compat = director.conShell { director.compatibilidad().ejecutar() } ?: emptyList()
-        val sonda = director.conShell { director.compatibilidad().sondar() }
+        val congeladasLeidas = runCatching {
+            director.conShell { director.apps().congeladas() } ?: emptySet()
+        }.getOrElse { anotarFalloLectura("congeladas · ${it.message}"); emptySet() }
+        val pantalla = runCatching { director.conShell { director.pantalla().leer() } }
+            .getOrElse { anotarFalloLectura("pantalla · ${it.message}"); null }
+        val compat: List<Compatibilidad.Prueba> = runCatching {
+            director.conShell { director.compatibilidad().ejecutar() }
+        }.getOrElse { anotarFalloLectura("compatibilidad · ${it.message}"); emptyList() }
+            ?: emptyList()
+        val sonda = runCatching { director.conShell { director.compatibilidad().sondar() } }
+            .getOrElse { anotarFalloLectura("sonda · ${it.message}"); null }
         withContext(Dispatchers.Main) {
             congeladas = congeladasLeidas
             pantallaActual = pantalla
@@ -211,11 +298,13 @@ private fun App(
         }
     }
 
-    LaunchedEffect(Unit) { releer() }
+    // Un LaunchedEffect que lanza una excepción tumba la app entera: aquí NADA sale sin red.
+    LaunchedEffect(Unit) { runCatching { releer() } }
 
     // Los datos del APK se leen una vez, en segundo plano: son varios MB y no pueden
     // bloquear el primer pintado. Mientras tanto la pantalla ya está en pie.
     LaunchedEffect(Unit) {
+      runCatching {
         withContext(Dispatchers.IO) {
             val ctx = contexto
             val eds = Datos.ediciones(ctx)
@@ -259,8 +348,14 @@ private fun App(
                 }
             }
         }
+      }.onFailure {
+            // Los datos del APK son 14 MB de JSON: si uno viene corrupto, se dice y se sigue.
+            anotarFalloLectura("datos del APK · ${it.javaClass.simpleName}: ${it.message}")
+      }
     }
-    LaunchedEffect(estado) { if (director.hayShell()) releerShell() }
+    LaunchedEffect(estado) {
+        if (director.hayShell()) runCatching { releerShell() }
+    }
 
     // El panel de cada app: hoja de cristal a pantalla completa.
     panelDe?.let { paquete ->
@@ -301,6 +396,8 @@ private fun App(
     }
 
     PantallaPrincipal(
+        falloLectura = falloLectura,
+        onDescartarFalloLectura = { onFalloLectura("") },
         director = director,
         estadoVia = estado,
         perfilActivo = perfil,
@@ -529,7 +626,7 @@ private fun App(
             irreversibleAplicado = false,
             sinApps = apps.isEmpty(),
         ),
-        version = "1.8.0",
+        version = "1.8.1",
     )
 }
 

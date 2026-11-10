@@ -3,6 +3,32 @@
 Máquina de compilación: JDK 21.0.13 · Gradle 8.11.1 · Android SDK platform 35 ·
 build-tools 35.0.0.
 
+## 1.8.1 · la app que se cerraba y el fin del disfraz de HTML
+
+Dos encargos en este tramo: **que no se cierre** y **cambiar el sistema de diseño**, no retocarlo.
+
+| Qué | Cómo | Resultado |
+|---|---|---|
+| Un fallo de lectura ya no cierra la app | `pruebasNucleo`, sobre `MainActivity.kt` | las 5 lecturas del teléfono van una a una por `proteger`; ninguna suelta |
+| Los arranques van protegidos | idem | los `LaunchedEffect` van por `runCatching` |
+| Si algo se rompe, se ve | idem sobre `RebornApp.kt` + manifiesto | manejador global → parte en `filesDir/ultimo-fallo.txt` → relanza y enseña el parte |
+| La pantalla del parte existe | idem, sobre el fuente | `ui/PantallaFallo.kt`, con «Copiar el parte» y «Seguir usando la app» |
+| El aviso de lectura se enseña | a mano | fila ámbar en Home con el motivo y «toca para ocultar» |
+| **Ningún degradado de adorno** | `pruebasNucleo`, sobre `ui/` | **0** en pantallas; el único degradado vivo es el del tema y está declarado |
+| **El vidrio no es la norma** | idem | 18 usos → **0** en el contenido; sólo el tema lo declara |
+| **Sin violeta de plantilla** | idem, por los canales RGB de la paleta | **0** colores violeta; **1** acento de marca (`0xFF4C9AFF`) |
+| Fondos neutros | idem | los 3 fondos tienen los canales a menos de 24 de distancia |
+| Tres niveles de superficie | idem | `superficie`, `superficieAlta`, `superficieMasAlta` |
+| Tres tratamientos de botón | idem | `Boton` (relleno), `BotonFila` (fila pulsable), `BotonPlano` (texto) |
+| Suite completa | `gradle :app:pruebasNucleo` | **326 comprobaciones, 0 fallos** |
+
+**Lo que NO está probado en 1.8.1, y se dice:** el arreglo del cierre es estructural (se han
+blindado las lecturas y hay red de seguridad), pero **no se ha reproducido el cierre en el
+TECNO BG7** porque no hay ni emulador con KVM ni teléfono conectado en la máquina de
+compilación. Si vuelve a cerrarse, ahora **queda un parte** en `filesDir/ultimo-fallo.txt` y la
+app lo enseña al abrir: ese texto es lo que hace falta para arreglarlo de verdad. El rediseño
+tampoco está visto en pantalla; compila y las reglas lo vigilan.
+
 ## 1.8.0 · punto de mira, FPS y GPU
 
 | Qué | Cómo | Resultado |

@@ -17,6 +17,24 @@ Cambiar el modelo es útil para que un juego aplique un preset gráfico en vez d
 terceros, no trae binarios ajenos. Ver [PROCEDENCIA.md](PROCEDENCIA.md) para el detalle
 de qué se tomó como referencia del proyecto original y qué se descartó, con nombre y motivo.
 
+## Que no se cierre, y que no parezca HTML (1.8.1)
+
+Antes de añadir nada más, dos cosas que estaban mal de raíz.
+
+**Se cerraba.** El arranque leía el teléfono (diagnóstico, límites, apps, perfiles) dentro de la
+composición: cualquier excepción de una de esas llamadas tumbaba la app sin decir nada. Ahora
+cada lectura va protegida por separado, y si una falla se enseña un aviso en la pantalla de
+inicio en vez de morir. Además hay un manejador global de últimos recursos: si algo se escapa
+igual, se guarda un parte en `filesDir/ultimo-fallo.txt`, la app se vuelve a abrir y **te enseña
+el parte**, con un botón para copiarlo.
+
+**Parecía una plantilla.** El problema no era un icono: era el sistema. Había degradados de
+adorno en cada caja, cinco acentos compitiendo, vidrio por todas partes y un violeta de plantilla.
+Ahora hay un fondo neutro, tres niveles de superficie que se distinguen por tono, **un** acento
+(`#4C9AFF`) y el color reservado para decir algo (verde = bien, ámbar = ojo, rojo = no). Sin
+degradados, sin vidrio en el contenido, sin violeta. Y las pruebas lo vigilan: si alguien vuelve
+a meter un degradado de adorno o un violeta, `pruebasNucleo` falla.
+
 ## Punto de mira y FPS (1.8.0)
 
 Es lo único de la app que se ve **mientras se juega**, y hasta la 1.7.1 no existía: teníamos

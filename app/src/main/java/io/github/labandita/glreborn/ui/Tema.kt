@@ -29,33 +29,67 @@ import androidx.compose.ui.unit.sp
  * En modo avión se ve igual.
  */
 object Cristal {
-    // Fondo: degradados profundos, como el cielo de una app de anime a medianoche.
-    val fondoArriba = Color(0xFF12081F)
-    val fondoMedio = Color(0xFF1B1030)
-    val fondoAbajo = Color(0xFF0A0612)
+    /*
+      ── RELECTURA DEL TEMA, 1.8.1 ────────────────────────────────────────────────
+      Lo que había era el ejemplo de manual de «diseño que parece HTML»: fondo con
+      degradado violeta, acento violeta, acento cian, acento rosa, y vidrio con borde
+      blanco en cada caja. Todo pesaba igual y nada comunicaba.
 
-    // Acentos: violeta y cian, con un rosa de remate.
-    val violeta = Color(0xFF9D7BFF)
-    val cian = Color(0xFF5CE1E6)
-    val rosa = Color(0xFFFF7AB6)
-    val verde = Color(0xFF4ADE80)
-    val ambar = Color(0xFFFFC24B)
-    val rojo = Color(0xFFFF6B81)
+      Lo que hay ahora, y por qué:
 
-    val texto = Color(0xFFF4F1FF)
-    val textoSuave = Color(0xFFB5AECF)
+      · UN solo acento funcional: el verde de «esto funciona». El cian deja de ser adorno y
+        pasa a ser el color de la marca, usado SÓLO en la cabecera y en lo seleccionado.
+        El rosa desaparece del sistema.
+      · Fondo casi negro neutro, no violeta. Una herramienta de sistema se lee sobre negro;
+        el violeta era un disfraz.
+      · Tres superficies con tono creciente en vez de un borde blanco en todo: la altura se
+        expresa con TONO, que es la guía de Material 3. El borde se reserva para lo que
+        necesita un límite de verdad.
+      · El vidrio sobrevive SÓLO en lo que flota (la barra de abajo). Ya no hay vidrio en
+        cada tarjeta: eso era lo que aplastaba la jerarquía.
+      · Verde, ámbar y rojo se quedan porque comunican (se puede / cuidado / no se puede).
+    */
 
-    // El cristal: blanco muy transparente sobre el que se apoya el desenfoque.
-    val vidrio = Color(0x1AFFFFFF)
-    val vidrioFuerte = Color(0x26FFFFFF)
-    val bordeLuz = Color(0x33FFFFFF)
-    val bordeLuzAlto = Color(0x66FFFFFF)
+    // Fondo: neutro y profundo. Sin violeta.
+    val fondoArriba = Color(0xFF0B0D10)
+    val fondoMedio = Color(0xFF0E1116)
+    val fondoAbajo = Color(0xFF080A0D)
 
-    val degradadoFondo = Brush.verticalGradient(
-        listOf(fondoArriba, fondoMedio, fondoAbajo)
-    )
-    val degradadoAcento = Brush.linearGradient(listOf(violeta, cian))
-    val degradadoCalido = Brush.linearGradient(listOf(rosa, violeta))
+    // Superficie de contenido: tres pasos de tono. La altura se ve, no se adivina.
+    val superficie = Color(0xFF14181E)
+    val superficieAlta = Color(0xFF1B2028)
+    val superficieMasAlta = Color(0xFF232A34)
+
+    // El único acento de marca (cabecera y selección).
+    val marca = Color(0xFF4C9AFF)
+
+    // Estados. Comunican, no decoran.
+    val verde = Color(0xFF3DDC84)
+    val ambar = Color(0xFFFFB020)
+    val rojo = Color(0xFFFF5A6E)
+
+    // Compatibilidad: nombres antiguos que aún usan las pantallas que no se han
+    // reescrito. Apuntan a la paleta nueva para que TODO el blanco y negro cuadre.
+    val violeta = marca
+    val cian = marca
+    val rosa = superficieMasAlta
+
+    val texto = Color(0xFFEDF1F7)
+    val textoSuave = Color(0xFF98A2B3)
+    val textoTenue = Color(0xFF667085)
+
+    // Bordes: discretos. Antes eran blancos al 20-40 % en todas partes.
+    val bordeLuz = Color(0x14FFFFFF)
+    val bordeLuzAlto = Color(0x24FFFFFF)
+
+    // Vidrio: sólo para lo que flota.
+    val vidrio = Color(0xFF14181E)
+    val vidrioFuerte = Color(0xFF232A34)
+
+    val degradadoFondo = Brush.verticalGradient(listOf(fondoArriba, fondoMedio, fondoAbajo))
+    /** Ya no hay degradado de acento: un degradado era el adorno que había que quitar. */
+    val degradadoAcento = Brush.linearGradient(listOf(marca, marca))
+    val degradadoCalido = Brush.linearGradient(listOf(marca, marca))
 }
 
 private val esquema = darkColorScheme(

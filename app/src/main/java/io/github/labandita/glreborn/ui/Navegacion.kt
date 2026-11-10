@@ -15,7 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,56 +40,52 @@ fun PildoraDestinos(
 ) {
     Row(
         modifier
-            .padding(horizontal = 14.dp, vertical = 16.dp)
             .fillMaxWidth()
-            .vidrioAlto(30)
-            .padding(horizontal = 6.dp, vertical = 7.dp),
+            .background(Cristal.superficie)
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Destino.entries.forEach { d ->
             val activo = d == actual
-            // Muelle de verdad: la pastilla crece al seleccionar, no salta.
             val escala by animateFloatAsState(
-                targetValue = if (activo) 1f else 0.94f,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMediumLow),
+                targetValue = if (activo) 1f else 0.92f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
                 label = "muelle-${d.name}",
             )
             Column(
                 Modifier
                     .weight(1f)
                     .scale(escala)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        if (activo)
-                            Brush.linearGradient(
-                                listOf(
-                                    Cristal.violeta.copy(alpha = 0.34f),
-                                    Cristal.cian.copy(alpha = 0.16f),
-                                )
-                            )
-                        else Brush.linearGradient(
-                            listOf(Cristal.vidrio.copy(alpha = 0f), Cristal.vidrio.copy(alpha = 0f))
-                        )
-                    )
                     .clickable { onDestino(d) }
-                    .padding(vertical = 7.dp),
+                    .padding(vertical = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 IconoDestino(
                     destino = d,
-                    color = if (activo) Cristal.cian else Cristal.textoSuave,
-                    tamano = if (activo) 23.dp else 21.dp,
+                    color = if (activo) Cristal.marca else Cristal.textoTenue,
+                    tamano = 22.dp,
                 )
-                Spacer(Modifier.height(3.dp))
+                Spacer(Modifier.height(4.dp))
                 Text(
                     d.titulo,
-                    fontSize = 8.sp,
+                    fontSize = 9.sp,
                     letterSpacing = 0.2.sp,
                     fontWeight = if (activo) FontWeight.Bold else FontWeight.Normal,
-                    color = if (activo) Cristal.texto else Cristal.textoSuave,
+                    color = if (activo) Cristal.texto else Cristal.textoTenue,
                     maxLines = 1,
+                )
+                // Indicador de 2dp: dice dónde estás sin pintar una pastilla entera.
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    Modifier
+                        .width(16.dp)
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp))
+                        .background(if (activo) Cristal.marca else Color.Transparent),
                 )
             }
         }
@@ -125,33 +121,36 @@ fun FilaPestanas(
     Row(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Cristal.vidrio)
-            .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .background(Cristal.fondoArriba)
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         lista.forEach { p ->
             val activa = p == actual
-            Box(
-                Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(15.dp))
-                    .background(if (activa) Cristal.vidrioFuerte else Cristal.vidrio.copy(alpha = 0f))
-                    .clickable { onPestana(p) }
-                    .padding(vertical = 9.dp),
-                contentAlignment = Alignment.Center,
+            Column(
+                Modifier.clickable { onPestana(p) }.padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    p.titulo,
-                    fontSize = 10.5.sp,
+                    p.titulo.uppercase(),
+                    fontSize = 10.sp,
+                    letterSpacing = 1.sp,
                     maxLines = 1,
-                    fontWeight = if (activa) FontWeight.Bold else FontWeight.Normal,
-                    color = if (activa) Cristal.texto else Cristal.textoSuave,
+                    fontWeight = if (activa) FontWeight.Bold else FontWeight.Medium,
+                    color = if (activa) Cristal.texto else Cristal.textoTenue,
+                )
+                Spacer(Modifier.height(6.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .background(if (activa) Cristal.marca else Color.Transparent),
                 )
             }
         }
     }
+    // La línea que cierra la tira, para que el subrayado tenga de dónde colgar.
+    Box(Modifier.fillMaxWidth().height(1.dp).background(Cristal.bordeLuz))
 }
 
 /** Chip de modo para la cabecera. Usa el enum real del core, no una copia. */

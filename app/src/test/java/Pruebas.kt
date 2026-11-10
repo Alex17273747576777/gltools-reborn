@@ -1035,8 +1035,8 @@ run {
         // ── 7. Botones con importancia, no todos iguales ───────────────────
         check(
             "existen al menos tres tratamientos de botón",
-            todos.contains("Boton(") && todos.contains("BotonHome(") &&
-                todos.contains("BotonPlano("),
+            todos.contains("fun Boton(") && todos.contains("fun BotonPlano(") &&
+                todos.contains("fun BotonFila("),
         )
 
         // ── 8. Nada de emojis como iconos de interfaz ──────────────────────
@@ -1190,6 +1190,125 @@ run {
             o.optString("descarte").contains("GSMArena") &&
                 o.optString("descarte").contains("versus.com"))
     }
+
+
+    // ── 1.8.1: el usuario dijo «el diseño sigue siendo una porquería de HTML» ──
+    // Lo que fallaba no era un glifo suelto: era el sistema entero. Degradado violeta en
+    // cada caja, cinco acentos, vidrio en el contenido. Estas comprobaciones lo prohíben.
+    println()
+    println("── ley de diseño: sin disfraz de plantilla ──")
+
+    val temaFuente = listOf(
+        "app/src/main/java/io/github/labandita/glreborn/ui/Tema.kt",
+        "src/main/java/io/github/labandita/glreborn/ui/Tema.kt",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (temaFuente != null) {
+        val tema = temaFuente.readText()
+        val colores = Regex("Color\\(0xFF([0-9A-Fa-f]{6})\\)").findAll(tema)
+            .map { it.groupValues[1] }.toList()
+        check("el tema declara una paleta de verdad", colores.size >= 12, "${colores.size}")
+
+        // Nada de violeta de plantilla: el violeta saturado es el tic más repetido.
+        val violetas = colores.count { hex ->
+            val r = hex.substring(0, 2).toInt(16)
+            val g = hex.substring(2, 4).toInt(16)
+            val b = hex.substring(4, 6).toInt(16)
+            b > r + 40 && b > g + 40 && r > g && r > 100
+        }
+        check("el tema no lleva violeta de plantilla", violetas == 0, "$violetas colores violeta")
+
+        // Un solo acento de marca: como mucho tres colores saturados de acento.
+        val acentosSaturados = colores.count { hex ->
+            val r = hex.substring(0, 2).toInt(16)
+            val g = hex.substring(2, 4).toInt(16)
+            val b = hex.substring(4, 6).toInt(16)
+            maxOf(r, g, b) > 180 && minOf(r, g, b) < 130
+        }
+        check("hay pocos acentos saturados (no cinco)", acentosSaturados <= 5, "$acentosSaturados")
+
+        // El fondo es neutro: en un gris, los tres canales casi iguales.
+        val fondos = Regex("val fondo\\w* = Color\\(0xFF([0-9A-Fa-f]{6})\\)").findAll(tema)
+            .map { it.groupValues[1] }.toList()
+        check("los fondos son neutros, no violetas", fondos.isNotEmpty() && fondos.all { hex ->
+            val r = hex.substring(0, 2).toInt(16)
+            val g = hex.substring(2, 4).toInt(16)
+            val b = hex.substring(4, 6).toInt(16)
+            maxOf(r, g, b) - minOf(r, g, b) <= 24
+        }, fondos.toString())
+    }
+
+    // Los degradados de adorno están prohibidos en las pantallas.
+    if (uiDir != null) {
+        val fuentesUi2 = uiDir.listFiles { f -> f.extension == "kt" }!!.sortedBy { it.name }
+        val conDegradado = fuentesUi2.filter { f ->
+            val txt = f.readText()
+            // El tema puede declarar degradados; las pantallas no deben usarlos de adorno.
+            f.name != "Tema.kt" && Regex("Brush\\.(linear|vertical)Gradient\\(").containsMatchIn(txt)
+        }.map { it.name }
+        check(
+            "ninguna pantalla usa degradados de adorno",
+            conDegradado.isEmpty(),
+            conDegradado.toString(),
+        )
+
+        // El vidrio no puede estar en el contenido: como mucho 2 usos en toda la interfaz.
+        val usosVidrio = fuentesUi2.sumOf { f ->
+            Regex("\\.vidrio(Alto)?\\(").findAll(f.readText()).count()
+        }
+        check("el vidrio es la excepción, no la norma", usosVidrio <= 2, "$usosVidrio usos")
+
+        // Las superficies se expresan con tono: tiene que existir la escala.
+        val temaTxt = temaFuente?.readText() ?: ""
+        check("hay tres niveles de superficie con tono",
+            temaTxt.contains("val superficie ") && temaTxt.contains("superficieAlta") &&
+                temaTxt.contains("superficieMasAlta"))
+    }
+
+    // ── 1.8.1: la app no puede cerrarse en silencio ─────────────────────────
+    println()
+    println("── blindaje contra cierres ──")
+    val mainFuente = listOf(
+        "app/src/main/java/io/github/labandita/glreborn/MainActivity.kt",
+        "src/main/java/io/github/labandita/glreborn/MainActivity.kt",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (mainFuente != null) {
+        val txt = mainFuente.readText()
+        check(
+            "cada lectura del teléfono va protegida por separado",
+            txt.contains("protegerCon(\"estado\"") &&
+                txt.contains("proteger(\"diagnóstico\"") &&
+                txt.contains("proteger(\"límites\"") &&
+                txt.contains("proteger(\"aplicado\"") &&
+                txt.contains("proteger(\"biblioteca\""),
+        )
+        check(
+            "los LaunchedEffect no pueden lanzar excepciones",
+            Regex("LaunchedEffect\\([^)]*\\)\\s*\\{\\s*runCatching").findAll(txt).count() >= 2,
+        )
+        check("un fallo de lectura se enseña, no se traga",
+            txt.contains("onFalloLectura"))
+    }
+    val appFuente = listOf(
+        "app/src/main/java/io/github/labandita/glreborn/RebornApp.kt",
+        "src/main/java/io/github/labandita/glreborn/RebornApp.kt",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    check("existe un manejador global de fallos", appFuente != null)
+    if (appFuente != null) {
+        val txt = appFuente.readText()
+        check("guarda el parte en disco", txt.contains("RegistroFallos.guardar"))
+        check("y relanza la app para poder enseñarlo",
+            txt.contains("EXTRA_MOSTRAR_FALLO") && txt.contains("startActivity"))
+    }
+    val manifiestoTxt = listOf(
+        "app/src/main/AndroidManifest.xml", "src/main/AndroidManifest.xml",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }?.readText() ?: ""
+    check("la Application está declarada en el manifiesto",
+        manifiestoTxt.contains("android:name=\".RebornApp\""))
+    check("existe la pantalla que enseña el fallo",
+        listOf(
+            "app/src/main/java/io/github/labandita/glreborn/ui/PantallaFallo.kt",
+            "src/main/java/io/github/labandita/glreborn/ui/PantallaFallo.kt",
+        ).any { java.io.File(it).exists() })
 
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
