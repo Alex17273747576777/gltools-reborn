@@ -26,6 +26,8 @@ class EjecutorRendimiento(
                 "«${accion.nombre}» actúa sobre una app concreta: elige una primero.")
         }
 
+        if (accion.id == "rendimiento-fijo") return Sistema(shell).modoRendimiento(true)
+
         val lineas = mutableListOf<String>()
         Rendimiento.comando(accion, paquete).forEach { comando ->
             val r = shell.correr(comando)
@@ -66,6 +68,8 @@ class EjecutorRendimiento(
         if (!shell.disponible()) {
             return Resultado(false, Via.NINGUNA, "Sin Shizuku no se puede deshacer.")
         }
+        if (accion.id == "rendimiento-fijo") return Sistema(shell).modoRendimiento(false)
+
         val lineas = mutableListOf<String>()
         Rendimiento.revertir(accion, paquete).forEach { comando ->
             val r = shell.correr(comando)

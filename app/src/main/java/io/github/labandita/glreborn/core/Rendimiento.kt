@@ -112,8 +112,8 @@ object Rendimiento {
         Accion(
             id = "rendimiento-fijo",
             nombre = "Modo de rendimiento fijo",
-            queHace = "Pide al sistema el modo de rendimiento sostenido (el mismo que activan " +
-                "algunos juegos). Gasta más batería y calienta más. Idea de «Performance Mode».",
+            queHace = "Solicita límites acotados de CPU/GPU para comparar pruebas. No es el modo " +
+                "sostenido de las apps ni garantiza frecuencias máximas. Puede sobrecalentarse.",
             aplicar = listOf("cmd power set-fixed-performance-mode-enabled true"),
             // La comprobación es el código de salida de la propia orden, que es lo único que
             // Android contesta: 0 sólo si el HAL de energía aceptó el modo (AOSP,

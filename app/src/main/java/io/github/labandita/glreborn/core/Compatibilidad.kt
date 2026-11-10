@@ -23,7 +23,7 @@ class Compatibilidad(private val shell: Shell) {
         /** Prefijos que el dominio `shell` puede escribir (AOSP, system/sepolicy). */
         val PREFIJOS_SIN_ROOT = listOf("debug.", "persist.debug.", "log.tag.", "persist.log.tag.")
         /** La única pregunta que Android contesta sobre el modo fijo: su código de salida. */
-        const val SONDA_MODO_FIJO = "cmd power set-fixed-performance-mode-enabled false"
+        const val SONDA_MODO_FIJO = "cmd power help"
 
         /**
          * ¿Puede la vía ADB —Shizuku sin root: dominio SELinux `shell`, uid 2000— escribir esta
@@ -214,9 +214,10 @@ class Compatibilidad(private val shell: Shell) {
             sdk < 30 -> Prueba(nombre, Prueba.Estado.NO_APLICA,
                 "el modo de rendimiento fijo existe desde Android 11 (API 30); este teléfono es API $sdk")
             codigo == null -> Prueba(nombre, Prueba.Estado.FALLA, "sin respuesta del gestor")
-            codigo == 0 -> Prueba(nombre, Prueba.Estado.PASA,
-                "el servicio de energía aceptó la orden: este teléfono admite el modo fijo. " +
-                    "(Se probó pidiendo «apagado»: si lo tenías encendido, vuelve a encenderlo.)")
+            texto.contains("Power manager (power) commands:") -> Prueba(nombre, Prueba.Estado.NO_APLICA,
+                "La orden devolvió ayuda, no una confirmación. El servicio sí respondió.")
+            codigo == 0 && !texto.contains("Failed to") && !texto.contains("Unknown command") -> Prueba(nombre, Prueba.Estado.PASA,
+                "La shell aceptó la solicitud. Esto no mide CPU/GPU ni confirma una mejora física.")
             texto.contains("FIXED_PERFORMANCE") || texto.contains("Power HAL") ->
                 Prueba(nombre, Prueba.Estado.FALLA,
                     "el servicio de energía responde, pero este teléfono no implementa el modo " +
@@ -259,22 +260,50 @@ class Compatibilidad(private val shell: Shell) {
     }
 
     private fun escribirYDeshacer(nombre: String, clave: String): Prueba {
-        val antes = shell.correr("getprop $clave")?.texto?.trim().orEmpty()
+        fun citar(valor: String): String = "'" + valor.replace("'", "'\"'\"'") + "'"
+        val lectura = shell.correr("getprop $clave")
+        if (lectura?.ok != true) return Prueba(nombre, Prueba.Estado.FALLA,
+            "No se pudo leer el valor original; no se intentó escribir.")
+        val antes = lectura.texto.trim()
         val escribio = shell.correr("setprop $clave 1")
-        val leido = shell.correr("getprop $clave")?.texto?.trim().orEmpty()
-        // Se deshace SIEMPRE, antes de devolver el resultado.
-        if (escribio != null) shell.correr("setprop $clave '$antes'")
-        return juzgarEscritura(nombre, clave, escribio?.codigo, escribio?.motivo.orEmpty(), leido)
+        val lecturaNueva = shell.correr("getprop $clave")
+        val restauracion = shell.correr("setprop $clave ${citar(antes)}")
+        val lecturaFinal = shell.correr("getprop $clave")
+        if (restauracion?.ok != true || lecturaFinal?.ok != true || lecturaFinal.texto.trim() != antes) {
+            return Prueba(nombre, Prueba.Estado.FALLA,
+                "Restauración de `$clave` NO CONFIRMADA. Valor original: ${antes.take(90)}. " +
+                    "Respuesta: ${restauracion?.motivo ?: "sin respuesta"}. Revisa el dispositivo.")
+        }
+        if (escribio?.ok != true || lecturaNueva?.ok != true) return Prueba(nombre, Prueba.Estado.FALLA,
+            "La escritura o su lectura falló. Se confirmó el valor anterior por lectura; " +
+                "esto no demuestra eliminación de la clave ni persistencia tras reiniciar.")
+        val resultado = juzgarEscritura(nombre, clave, escribio.codigo, escribio.motivo, lecturaNueva.texto.trim())
+        return resultado.copy(detalle = if (resultado.resultado == Prueba.Estado.PASA)
+            "Escritura y restauración del valor confirmadas por lectura. No demuestra rendimiento, " +
+                "eliminación de la clave ni persistencia tras reiniciar."
+            else resultado.detalle)
     }
 
-    /**
-     * Modo rendimiento: se pide «apagado» y se mira el código. Pedir «apagado» pregunta lo
-     * mismo que pedir «encendido» (¿acepta el HAL este modo?) sin calentar el teléfono.
-     */
+    /** Sólo lectura: una prueba de compatibilidad no debe apagar un modo activo. */
+    fun juzgarAyudaModoFijo(sdk: Int, codigo: Int?, texto: String): Prueba {
+        val nombre = "Modo rendimiento (cmd)"
+        if (sdk < 30) return Prueba(nombre, Prueba.Estado.NO_APLICA, "Disponible desde API 30.")
+        if (codigo == null) return Prueba(nombre, Prueba.Estado.FALLA, "Sin respuesta de la shell; causa no determinada.")
+        // BasicShellCommandHandler imprime ayuda y devuelve -1 (255 en shell). No es fallo del servicio.
+        val ayudaValida = texto.contains("Power manager (power) commands:") && codigo in listOf(0, -1, 255)
+        if (!ayudaValida) return Prueba(nombre, Prueba.Estado.FALLA,
+            "No se obtuvo ayuda reconocible (código $codigo): ${texto.take(600)}")
+        val anunciada = Regex("(?m)^\\s*set-fixed-performance-mode-enabled(?:\\s|\\[|$)").containsMatchIn(texto)
+        return if (anunciada) Prueba(nombre, Prueba.Estado.PASA,
+            "La ROM anuncia la orden. Sólo se consultó ayuda: soporte del HAL y efecto físico NO VERIFICADOS.")
+        else Prueba(nombre, Prueba.Estado.NO_APLICA,
+            "La ayuda no anuncia esta orden. El servicio respondió; no se activó ni desactivó nada.")
+    }
+
     private fun probarModoRendimiento(): Prueba {
-        if (Build.VERSION.SDK_INT < 30) return juzgarModoFijo(Build.VERSION.SDK_INT, null, "")
+        if (Build.VERSION.SDK_INT < 30) return juzgarAyudaModoFijo(Build.VERSION.SDK_INT, null, "")
         val r = shell.correr(SONDA_MODO_FIJO)
-        return juzgarModoFijo(Build.VERSION.SDK_INT, r?.codigo, r?.texto.orEmpty())
+        return juzgarAyudaModoFijo(Build.VERSION.SDK_INT, r?.codigo, r?.texto.orEmpty())
     }
 
     private fun probar(nombre: String, comando: String): Prueba {

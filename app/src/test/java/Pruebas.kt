@@ -1688,8 +1688,8 @@ run {
             val sistema = fuentes.firstOrNull { it.name == "Sistema.kt" }
             check("ningún código lee el ajuste inventado del modo rendimiento",
                 !todo.contains("power_fixed_performance_mode_enabled"))
-            check("ni pregunta `cmd power help`, que devuelve -1 siempre",
-                !todo.contains("cmd power help"))
+            check("la sonda de capacidad sólo lee ayuda",
+                io.github.labandita.glreborn.core.Compatibilidad.SONDA_MODO_FIJO == "cmd power help")
             check("la prueba de escritura usa una propiedad que la vía ADB puede escribir",
                 io.github.labandita.glreborn.core.Compatibilidad.escribibleSinRoot(
                     io.github.labandita.glreborn.core.Compatibilidad.CLAVE_PRUEBA))
@@ -2049,8 +2049,25 @@ run {
         val ayuda = cpi.juzgarModoFijo(34, 255, "Power manager (power) commands:\n  help\n    Print this help text.")
         check("la ayuda de `cmd power` ya no se lee como «el servicio no responde»",
             !ayuda.detalle.contains("no responde"))
-        check("la sonda del modo fijo es la orden real, no `help`",
-            cpd.SONDA_MODO_FIJO == "cmd power set-fixed-performance-mode-enabled false")
+        check("el diagnóstico no apaga el modo fijo para probarlo",
+            cpd.SONDA_MODO_FIJO == "cmd power help")
+        val minima = "Power manager (power) commands:\n  help\n    Print this help text."
+        val completa = minima + "\n  set-fixed-performance-mode-enabled [true|false]"
+        check("ayuda mínima con 255 no es un servicio detenido",
+            cpi.juzgarAyudaModoFijo(34, 255, minima).resultado == est.NO_APLICA)
+        check("ayuda con setter y 255 anuncia capacidad sin cambiar el modo",
+            cpi.juzgarAyudaModoFijo(34, 255, completa).let {
+                it.resultado == est.PASA && it.detalle.contains("NO VERIFICADOS") })
+        check("ayuda con setter y 0 también se admite",
+            cpi.juzgarAyudaModoFijo(34, 0, completa).resultado == est.PASA)
+        check("permiso denegado no se confunde con falta de soporte",
+            cpi.juzgarAyudaModoFijo(34, 1, "Permission denied").resultado == est.FALLA)
+        check("sin respuesta no se inventa diagnóstico del daemon",
+            cpi.juzgarAyudaModoFijo(34, null, "").resultado == est.FALLA)
+        check("API 29 no ofrece modo fijo",
+            cpi.juzgarAyudaModoFijo(29, null, "").resultado == est.NO_APLICA)
+        check("help con código cero no confirma un setter",
+            cpi.juzgarModoFijo(34, 0, minima).resultado == est.NO_APLICA)
         check("penetración: la escritura de propiedades prueba una clave escribible",
             rpen.PRUEBAS.none { it.second.contains("setprop persist.reborn") })
         val rfijo = io.github.labandita.glreborn.core.Rendimiento.catalogo.first { it.id == "rendimiento-fijo" }

@@ -88,50 +88,22 @@ class Sistema(private val shell: Shell, private val aplicado: Aplicado? = null) 
         )
     }
 
-    /**
-     * Modo rendimiento del sistema. Sin root sólo se puede pedir; el sistema decide.
-     *
-     * La única respuesta que da Android es el código de salida de la orden. Leído en
-     * `PowerManagerShellCommand.java` de AOSP: devuelve 0 **sólo si el HAL de energía aceptó
-     * el modo**, y -1 con «Failed to set FIXED_PERFORMANCE mode» si el teléfono no lo
-     * implementa. No hay nada más que leer.
-     *
-     * La versión anterior desconfiaba de ese código y, tras un 0, leía el ajuste global
-     * `power_fixed_performance_mode_enabled` para «comprobar el efecto». Ese ajuste no existe
-     * en ninguna versión de Android: salía siempre vacío y la app decía «el fabricante no lo
-     * aplica» en todos los teléfonos, también en los que acababan de aceptarlo. El interruptor
-     * parecía roto sin estarlo.
-     */
+    /** Aceptación de una solicitud no equivale a medir su efecto físico. */
     fun modoRendimiento(activar: Boolean): Resultado {
         if (!shell.disponible()) return Resultado(false, Via.NINGUNA, "Shizuku no está activo.")
+        val sdk = android.os.Build.VERSION.SDK_INT
+        if (sdk < 30) return Resultado(false, Via.SHIZUKU, "El modo fijo se documenta desde API 30.")
         val orden = "cmd power set-fixed-performance-mode-enabled $activar"
         val r = shell.correr(orden)
-            ?: return Resultado(false, Via.SHIZUKU, "El servicio de energía no respondió.")
-        val lineas = listOf("pedido: $orden", "código: ${r.codigo}",
-            "respuesta: ${r.texto.ifBlank { "(vacía)" }}")
-        if (r.codigo != 0) {
-            val sinHal = r.texto.contains("FIXED_PERFORMANCE") || r.texto.contains("Power HAL")
-            return Resultado(
-                ok = false,
-                via = Via.SHIZUKU,
-                detalle = if (sinHal)
-                    "Este teléfono no implementa el modo rendimiento fijo: el fabricante no lo " +
-                        "conectó al HAL de energía. No se ha cambiado nada y no se puede prometer más."
-                else
-                    "Este teléfono rechazó el modo rendimiento (código ${r.codigo}): " +
-                        r.motivo + ". No se ha cambiado nada.",
-                lineas = lineas,
-            )
-        }
+        val juicio = Compatibilidad(shell).juzgarModoFijo(sdk, r?.codigo, r?.texto.orEmpty())
         return Resultado(
-            ok = true,
+            ok = juicio.resultado == Compatibilidad.Prueba.Estado.PASA,
             via = Via.SHIZUKU,
-            detalle = if (activar)
-                "Modo rendimiento fijo activado: el servicio de energía aceptó la orden. Sube " +
-                    "el consumo y el calor. Android no lo guarda: tras reiniciar hay que pedirlo otra vez."
-            else
-                "Modo rendimiento fijo desactivado: el servicio de energía aceptó la orden.",
-            lineas = lineas,
+            detalle = juicio.detalle + " Solicitud: $activar. Efecto físico NO VERIFICADO. " +
+                "No se midieron rendimiento ni temperatura: no se puede prometer más. " +
+                "Modo de pruebas, no rendimiento máximo ni un perfil permanente.",
+            lineas = listOf("pedido: $orden", "código: ${r?.codigo ?: "sin respuesta"}",
+                "respuesta: ${r?.texto?.take(2000)?.ifBlank { "(vacía)" } ?: "sin respuesta"}"),
         )
     }
 
