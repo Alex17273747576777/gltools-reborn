@@ -656,7 +656,7 @@ private fun App(
             irreversibleAplicado = false,
             sinApps = apps.isEmpty(),
         ),
-        version = "1.9.4",
+        version = "1.9.5",
     )
 }
 

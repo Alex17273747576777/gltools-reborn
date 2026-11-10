@@ -839,8 +839,16 @@ fun PantallaPrincipal(
                             Cristal.cian,
                         )
                     }
+                    item { Spacer(Modifier.height(10.dp)) }
+                    item {
+                        SeccionRespaldo(
+                            perfiles = biblioteca,
+                            versionApp = version,
+                            modeloTelefono = datosSonda?.modelo ?: "sin modelo declarado",
+                            onImportar = { lista -> onGuardarVarios(lista) },
+                        )
+                    }
                 }
-
                 Pestana.SUPERPOSICION -> {
                     item {
                         PantallaSuperposicion(

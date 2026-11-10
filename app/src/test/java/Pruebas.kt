@@ -1500,6 +1500,74 @@ run {
             a.contains("releerSiToca()"))
     }
 
+
+    // ── 1.9.5: llevarte tus perfiles ─────────────────────────────────────────
+    //
+    // El respaldo tiene que sobrevivir a un viaje de ida y vuelta sin perder ni un campo, y
+    // tiene que decir que NO cuando le dan un fichero que no es suyo. Un importador que se traga
+    // cualquier cosa es peor que no tener importador.
+    println()
+    println("── respaldo de perfiles ──")
+    run {
+        val muestra = listOf(
+            io.github.labandita.glreborn.core.PerfilDispositivo(
+                id = "prueba-1", nombre = "Pixel 8 Pro", fabricante = "Google", marca = "google",
+                modelo = "Pixel 8 Pro", device = "husky", board = "husky", hardware = "husky",
+                soc = "Tensor G3", gpu = "Mali-G715", openglEs = "196610",
+                fuente = "especificaciones oficiales",
+                confianza = io.github.labandita.glreborn.core.PerfilDispositivo.Confianza.VERIFICADO,
+                nota = "perfil de prueba",
+            ),
+            io.github.labandita.glreborn.core.PerfilDispositivo(
+                id = "prueba-2", nombre = "Genérico", fabricante = "", marca = "", modelo = "X",
+                device = "x", board = "", hardware = "", soc = "", gpu = "", openglEs = "",
+                fuente = "generado del teléfono",
+                confianza = io.github.labandita.glreborn.core.PerfilDispositivo.Confianza.SIN_VERIFICAR,
+            ),
+        )
+        val escrito = io.github.labandita.glreborn.core.Respaldo.escribir(
+            muestra, versionApp = "1.9.5", modeloTelefono = "TECNO BG7", ahora = 1_700_000_000_000L,
+        )
+        check("el respaldo es JSON legible", escrito.trimStart().startsWith("{"))
+        check("lleva el nombre del formato",
+            escrito.contains(io.github.labandita.glreborn.core.Respaldo.FORMATO))
+        check("lleva la versión del formato",
+            escrito.contains("\"version\": ${io.github.labandita.glreborn.core.Respaldo.VERSION_FORMATO}"))
+        check("dice de dónde salió", escrito.contains("TECNO BG7"))
+        check("dice cuándo se hizo", escrito.contains("exportado_legible"))
+
+        val leido = io.github.labandita.glreborn.core.Respaldo.leer(escrito)
+        check("ida y vuelta: los dos perfiles vuelven", leido.perfiles.size == 2, "${leido.perfiles.size}")
+        check("ida y vuelta: no se pierde ningún campo",
+            leido.perfiles[0] == muestra[0] && leido.perfiles[1] == muestra[1])
+        check("ida y vuelta: la confianza se conserva",
+            leido.perfiles[1].confianza == io.github.labandita.glreborn.core.PerfilDispositivo.Confianza.SIN_VERIFICAR)
+        check("el resumen dice cuántos", leido.resumen.contains("2 perfiles"))
+
+        // Un fichero que no es suyo: se dice, no se traga.
+        val ajeno = io.github.labandita.glreborn.core.Respaldo.leer("{\"hola\": 1}")
+        check("un JSON ajeno se rechaza", !ajeno.ok && ajeno.formatoDesconocido)
+        val basura = io.github.labandita.glreborn.core.Respaldo.leer("no soy json")
+        check("la basura se rechaza sin romper", !basura.ok && basura.formatoDesconocido)
+
+        // Un perfil sin id no se puede ni distinguir: se descarta, y se cuenta.
+        val cojo = """{"formato":"glreborn-perfiles","version":1,"perfiles":[
+            {"nombre":"sin id"},{"id":"ok","nombre":"bueno","confianza":"PARCIAL"}]}"""
+        val mezcla = io.github.labandita.glreborn.core.Respaldo.leer(cojo)
+        check("un perfil cojo se descarta y se cuenta",
+            mezcla.perfiles.size == 1 && mezcla.descartados == 1, mezcla.resumen)
+
+        // Un fichero de una versión futura: se lee, pero se avisa.
+        val futuro = escrito.replace("\"version\": 1", "\"version\": 9")
+        val deFuturo = io.github.labandita.glreborn.core.Respaldo.leer(futuro)
+        check("un respaldo de versión futura se lee con aviso",
+            deFuturo.perfiles.size == 2 && deFuturo.motivoDescarte.contains("más nueva"))
+
+        check("el nombre del fichero lleva fecha",
+            io.github.labandita.glreborn.core.Respaldo.nombreDeFichero(1_700_000_000_000L)
+                .matches(Regex("glreborn-perfiles-\\d{8}-\\d{4}\\.json")))
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")
