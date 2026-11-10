@@ -1,0 +1,37 @@
+name: auditoria-publicaciones
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Herramienta oficial de Android
+        run: |
+          if [ ! -x "$ANDROID_HOME/build-tools/35.0.0/apksigner" ]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0"
+          fi
+          echo "APKSIGNER=$ANDROID_HOME/build-tools/35.0.0/apksigner" >> "$GITHUB_ENV"
+      - name: Verificar bytes, sumas y firmas de todos los APK
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          APPROVED_PUBLIC_CERTIFICATES: "1ff4c6ee90263a73a7ea6097de5b1f31bcd049c805e384904d2087b4c6c9e803,baedd474390ce53394a092ea49c20c0c7248da961fd72101af6b06a4647ffcca"
+          AUDIT_OUTPUT: ${{ runner.temp }}/auditoria-releases.json
+        run: python .github/scripts/auditar_releases.py
+      - name: Guardar resultados sin secretos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auditoria-publicaciones
+          path: ${{ runner.temp }}/auditoria-releases.json
+          if-no-files-found: error
