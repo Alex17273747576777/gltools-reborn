@@ -110,6 +110,37 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Se registró el cierre: el informe se genera una vez por sesión, no en cada giro. */
+    private var informeDeCierreHecho = false
+
+    /**
+     * Al cerrarse la app se generan el `.md` del auto-diagnóstico y el `.txt` de errores.
+     *
+     * Se hace en `onStop` y **sólo cuando la app deja de estar visible de verdad**
+     * (`isChangingConfigurations` en falso): girar el teléfono también llama a `onStop`, y generar
+     * dos informes por girar sería una forma estupenda de llenar la carpeta de basura.
+     *
+     * La medición y la escritura van en un hilo de trabajo con un tope de tiempo: cerrar la app
+     * no puede quedarse esperando a que el teléfono termine de medir.
+     */
+    override fun onStop() {
+        super.onStop()
+        if (isChangingConfigurations) return
+        if (informeDeCierreHecho && !isFinishing) return
+        val perfil = runCatching { PerfilesDiagnostico(this).leer() }.getOrDefault(PerfilDiagnostico())
+        if (!perfil.alCerrar) return
+        informeDeCierreHecho = true
+        val ctx = applicationContext
+        val version = Build.VERSION_REBORN
+        Thread {
+            runCatching {
+                Informes.alCerrar(ctx, version, perfil.profundo, perfil.conSonido)
+            }.onFailure {
+                RegistroErrores.anotar(ctx, "ERROR", "informe de cierre", "${it.javaClass.simpleName}: ${it.message}")
+            }
+        }.start()
+    }
+
     private fun shizukuListo(): Boolean = try {
         Shizuku.pingBinder()
     } catch (t: Throwable) {
@@ -225,6 +256,15 @@ private fun App(
         onDispose { ciclo.lifecycle.removeObserver(observador) }
     }
     var fichas by remember { mutableStateOf<List<Ficha>>(emptyList()) }
+    // ── 1.12.0 · auto-diagnóstico, ranking y penetración
+    var diagnosticoAuto by remember { mutableStateOf<DiagnosticoCompleto?>(null) }
+    var perfilDiag by remember { mutableStateOf(PerfilDiagnostico()) }
+    var midiendo by remember { mutableStateOf(false) }
+    var rutasInforme by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var ranking by remember { mutableStateOf<List<FichaAntutu>>(emptyList()) }
+    var rankingAdemas by remember { mutableStateOf<List<FichaAntutu>>(emptyList()) }
+    var capacidades by remember { mutableStateOf<List<Capacidad>>(emptyList()) }
+    var resumenPen by remember { mutableStateOf("") }
     var datosSonda by remember { mutableStateOf<Sonda.Datos?>(null) }
     var edicionesTop by remember { mutableStateOf<List<Datos.Edicion>>(emptyList()) }
     var edicionElegida by remember { mutableStateOf("") }
@@ -296,6 +336,10 @@ private fun App(
             director.aplicado().fichas(apps.associate { it.paquete to it.nombre })
         } ?: emptyList()
         biblioteca = proteger("biblioteca") { director.biblioteca().leer() } ?: emptyList()
+        perfilDiag = proteger("perfil de diagnóstico") { PerfilesDiagnostico(contexto).leer() }
+            ?: PerfilDiagnostico()
+        ranking = proteger("ranking AnTuTu") { Antutu.top(contexto) } ?: emptyList()
+        rankingAdemas = proteger("ranking · además") { Antutu.ademas(contexto) } ?: emptyList()
         if (estado == Director.Estado.SHIZUKU_SIN_PERMISO) {
             protegerLectura("pedir permiso") { onPedirShizuku() }
         }
@@ -515,6 +559,83 @@ private fun App(
             resultado = director.restaurar()
             actual = director.telefoniaActual()
         },
+        diagnostico = diagnosticoAuto,
+        perfilDiagnostico = perfilDiag,
+        midiendo = midiendo,
+        onMedir = {
+            midiendo = true
+            alcance.launch {
+                // La medición dura décimas de segundo pero se hace fuera del hilo de dibujo: una
+                // prueba de CPU dentro de la composición congela la interfaz.
+                val d = withContext(Dispatchers.Default) {
+                    Autodiagnostico.ejecutar(contexto, profundo = perfilDiag.profundo)
+                }
+                diagnosticoAuto = d
+                midiendo = false
+                val avisos = ReglasPerfilDiagnostico.avisos(d, perfilDiag)
+                if (avisos.isNotEmpty()) {
+                    resultado = Resultado(false, Via.NINGUNA, "Avisos: " + avisos.joinToString(" · "))
+                }
+            }
+        },
+        onPerfilDiagnostico = { p ->
+            val (valido, avisos) = PerfilesDiagnostico(contexto).guardar(p)
+            perfilDiag = valido
+            if (avisos.isNotEmpty()) {
+                resultado = Resultado(false, Via.NINGUNA, avisos.joinToString(" · "))
+            }
+        },
+        rutasInforme = rutasInforme,
+        onGuardarInforme = {
+            alcance.launch {
+                val ctx = contexto.applicationContext
+                val r = withContext(Dispatchers.IO) {
+                    Informes.alCerrar(ctx, Build.VERSION_REBORN, perfilDiag.profundo, perfilDiag.conSonido)
+                }
+                // Se enseña la ruta que devolvió el sistema, no la que se esperaba.
+                rutasInforme = r.rutas.map { it to "" } + r.fallos
+                resultado = if (r.huboArchivos && r.fallos.isEmpty())
+                    Resultado(true, Via.NINGUNA, "Informes guardados: " + r.rutas.joinToString(" · "))
+                else if (r.huboArchivos)
+                    Resultado(false, Via.NINGUNA, "Guardado " + r.rutas.joinToString(" · ") +
+                        "; falló: " + r.fallos.joinToString(" · ") { "${it.first}: ${it.second}" })
+                else Resultado(false, Via.NINGUNA, "No se pudo guardar: " +
+                    r.fallos.joinToString(" · ") { "${it.first}: ${it.second}" })
+            }
+        },
+        ranking = ranking,
+        rankingAdemas = rankingAdemas,
+        rankingConsultado = proteger("fecha del ranking") { Antutu.consultado(contexto) } ?: "",
+        onAplicarRanking = { f ->
+            val (perfilRanking, motivo) = Antutu.perfil(f)
+            if (perfilRanking == null) {
+                resultado = Resultado(false, Via.NINGUNA, motivo)
+            } else {
+                resultado = director.aplicar(perfilRanking)
+                actual = director.telefoniaActual()
+            }
+        },
+        onCrearPerfilRanking = { f ->
+            val (perfilRanking, motivo) = Antutu.perfil(f)
+            if (perfilRanking == null) {
+                resultado = Resultado(false, Via.NINGUNA, motivo)
+            } else {
+                val ok = runCatching { director.biblioteca().guardar(perfilRanking) }.isSuccess
+                resultado = Resultado(ok, Via.NINGUNA, if (ok)
+                    "«${f.nombre}» quedó en tu biblioteca, con sus datos y su fuente. No se aplicó."
+                else "No se pudo guardar el perfil.")
+                biblioteca = proteger("biblioteca") { director.biblioteca().leer() } ?: emptyList()
+            }
+        },
+        capacidades = capacidades,
+        resumenPenetracion = resumenPen,
+        onProbarPenetracion = {
+            alcance.launch {
+                val c = withContext(Dispatchers.IO) { ModoPenetracion(director.shell()).diagnosticar() }
+                capacidades = c
+                resumenPen = ModoPenetracion(director.shell()).resumen(c)
+            }
+        },
         onPanel = { paquete ->
             appPanel = apps.firstOrNull { it.paquete == paquete }
             panelDe = paquete
@@ -665,7 +786,7 @@ private fun App(
             irreversibleAplicado = false,
             sinApps = apps.isEmpty(),
         ),
-        version = "1.11.0",
+        version = "1.12.0",
     )
 }
 

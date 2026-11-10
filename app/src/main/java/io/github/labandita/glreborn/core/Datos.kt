@@ -180,6 +180,9 @@ object Datos {
 
     // ── Lectura desde los assets (necesita Android) ────────────────────────
 
+    /** Para los lectores de datos que viven en otro archivo (`Antutu`). */
+    internal fun leerTexto(context: Context, ruta: String): String? = texto(context, ruta)
+
     private fun texto(context: Context, ruta: String): String? = try {
         context.assets.open(ruta).bufferedReader().use { it.readText() }
     } catch (t: Throwable) {

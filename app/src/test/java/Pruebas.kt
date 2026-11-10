@@ -765,12 +765,14 @@ run {
     check(
         "Datos conserva TOP500, aplicado y dispositivos, y gana el historial",
         Navegacion.pestanas(Destino.DATOS) ==
-            listOf(Pestana.TOP500, Pestana.HISTORIAL, Pestana.APLICADO, Pestana.DISPOSITIVOS),
+            listOf(Pestana.TOP500, Pestana.HISTORIAL, Pestana.APLICADO, Pestana.DISPOSITIVOS,
+                Pestana.RANKING),
     )
     check(
-        "Ayuda conserva compatibilidad, diagnóstico, límites y fuentes",
+        "Ayuda conserva compatibilidad, diagnóstico, límites y fuentes, y gana automático y penetración",
         Navegacion.pestanas(Destino.AYUDA) ==
-            listOf(Pestana.COMPATIBILIDAD, Pestana.DIAGNOSTICO, Pestana.LIMITES, Pestana.FUENTES),
+            listOf(Pestana.COMPATIBILIDAD, Pestana.DIAGNOSTICO, Pestana.LIMITES, Pestana.FUENTES,
+                Pestana.DIAGNOSTICO_AUTO, Pestana.PENETRACION),
     )
     // Las diez secciones antiguas tienen que tener destino: ninguna se perdió.
     val antiguas = listOf(
@@ -1898,6 +1900,162 @@ run {
         }
         check("el historial lee, no duplica el estado", mov.exists() &&
             mov.readText().contains("registro.historial()") && mov.readText().contains("aplicado.fichas("))
+    }
+
+
+    // ── 1.12.0: auto-diagnóstico, informes al cerrar, ranking y penetración ───
+    //
+    // Lo que pidió el usuario: que al cerrar la app queden un `.md` y un `.txt` con todo, que el
+    // diagnóstico sea de verdad y que no se invente lo que no se puede medir, que entre el ranking
+    // AnTuTu completo y que el modo penetración compruebe en vez de prometer. Estas leyes obligan
+    // a eso, y las más importantes son las que vigilan lo que NO se puede afirmar.
+    println()
+    println("── auto-diagnóstico e informes ──")
+    run {
+        val inf = io.github.labandita.glreborn.core.Informe
+
+        // La barra ASCII: un dato se ve sin abrir la tabla, y nunca miente con el ancho.
+        check("la barra llena son todo bloques", inf.barra(100.0, 100.0, 10) == "█".repeat(10))
+        check("la barra vacía no pinta nada", inf.barra(0.0, 100.0, 10) == "░".repeat(10))
+        check("la barra siempre mide lo mismo", inf.barra(37.0, 100.0, 12).length == 12)
+        check("con total cero no se divide por cero", inf.barra(5.0, 0.0, 8) == "░".repeat(8))
+        check("un valor por encima del tope no se sale de la barra", inf.barra(500.0, 100.0, 8).length == 8)
+
+        // El informe: tiene que decir lo no medido con esas palabras, y no poner un cero.
+        val diag = io.github.labandita.glreborn.core.DiagnosticoCompleto(
+            cuando = 1_700_000_000_000L, duracionMs = 42,
+            equipo = listOf("Modelo declarado" to "TECNO BG7", "ABI" to "armeabi-v7a|x86"),
+            medidas = listOf(
+                io.github.labandita.glreborn.core.Medida("Memoria disponible", 1200.0, "MB", "de 3800 MB"),
+                io.github.labandita.glreborn.core.Medida("Temperatura de CPU", null, "°C", "",
+                    "no hay API pública"),
+            ),
+            errores = listOf("vulkan: la prueba lanzó SecurityException"),
+        )
+        val md = inf.markdown(diag, "1.12.0", "errores-reborn.txt")
+        check("el informe dice de qué versión es", md.contains("GLTools Reborn 1.12.0"))
+        check("lleva la tabla de medidas", md.contains("| Prueba | Valor | Unidad |"))
+        check("lo que no se midió dice «no medido»", md.contains("no medido"))
+        check("y lleva su motivo, no un cero", md.contains("no hay API pública"))
+        check("escapa la barra vertical para no romper la tabla", md.contains("armeabi-v7a\\|x86"))
+        check("dice lo que NO mide", md.contains("Qué NO mide este informe"))
+        check("no promete comparabilidad con AnTuTu", md.contains("No son puntos de AnTuTu"))
+        check("incluye los fallos del diagnóstico", md.contains("SecurityException"))
+        check("es Markdown de verdad: encabezados y bloques", md.contains("## ") && md.contains("```text"))
+        check("no sube nada: lo dice", md.contains("no se sube a ningún sitio"))
+
+        // El registro de errores: formato fijo, una línea por suceso, con nivel y hora.
+        check("el registro separa los campos con tabulador", "\t" in "a\tb")
+        check("el tope del registro existe", io.github.labandita.glreborn.core.RegistroErrores.MAX_BYTES > 0)
+
+        // El perfil del diagnóstico: se valida y se dice qué se corrigió, no se arregla en silencio.
+        val rp = io.github.labandita.glreborn.core.ReglasPerfilDiagnostico
+        val roto = io.github.labandita.glreborn.core.PerfilDiagnostico(msCpu = 99_999, umbralMemoriaPct = 5, nombre = "  ")
+        val (valido, avisos) = rp.validar(roto)
+        check("la duración de CPU se limita", valido.msCpu == 5000)
+        check("el umbral de memoria se limita", valido.umbralMemoriaPct == 50)
+        check("un perfil sin nombre recibe uno", valido.nombre == "Personalizado")
+        check("y se dice todo lo que se corrigió", avisos.size >= 3, avisos.toString())
+        val (sinPruebas, avisos2) = rp.validar(io.github.labandita.glreborn.core.PerfilDiagnostico(pruebas = emptySet()))
+        check("sin pruebas marcadas se mide lo mínimo", sinPruebas.pruebas.isNotEmpty())
+        check("y se avisa", avisos2.isNotEmpty())
+
+        // El archivo del perfil: ida y vuelta exacta, y ordenado para poder compararlo.
+        val p1 = io.github.labandita.glreborn.core.PerfilDiagnostico(
+            nombre = "Juego", profundo = false, msCpu = 150, umbralBateriaC = 45.5, conSonido = false,
+            pruebas = setOf("cpu", "memoria"),
+        )
+        val texto = rp.codificar(p1)
+        val p2 = rp.decodificar(texto)
+        check("el perfil vuelve igual de su archivo", p2 == p1, "$p2 != $p1")
+        check("el archivo es texto legible", texto.contains("nombre=Juego") && texto.contains("msCpu=150"))
+        check("el archivo no lleva JSON ni binario", !texto.contains("{") && !texto.contains("\u0000"))
+        check("un archivo roto no rompe la app", rp.decodificar("basura\nsin igual\nmsCpu=xxx").msCpu == 400)
+
+        // Avisos por umbral: sólo cuando de verdad se pasa.
+        val peor = io.github.labandita.glreborn.core.DiagnosticoCompleto(
+            cuando = 0, duracionMs = 1, equipo = emptyList(),
+            medidas = listOf(
+                io.github.labandita.glreborn.core.Medida("Memoria disponible", 50.0, "MB", "de 4000 MB"),
+                io.github.labandita.glreborn.core.Medida("Temperatura de batería", 45.0, "°C", ""),
+                io.github.labandita.glreborn.core.Medida("Almacenamiento libre", 200.0, "MB", ""),
+            ),
+            errores = emptyList(),
+        )
+        val porDefecto = io.github.labandita.glreborn.core.PerfilDiagnostico()
+        check("con el teléfono apurado salen los tres avisos",
+            rp.avisos(peor, porDefecto).size == 3, rp.avisos(peor, porDefecto).toString())
+        val mejor = peor.copy(medidas = listOf(
+            io.github.labandita.glreborn.core.Medida("Memoria disponible", 3000.0, "MB", "de 4000 MB"),
+        ))
+        check("con el teléfono holgado no se avisa de nada", rp.avisos(mejor, porDefecto).isEmpty())
+
+        // Método penetration: la clasificación, que es donde se suele mentir.
+        val rpen = io.github.labandita.glreborn.core.ReglasPenetracion
+        check("sin respuesta no hay capacidad", rpen.clasificar(null, null) == io.github.labandita.glreborn.core.Capacidad.Estado.NO)
+        check("un comando que no existe no está disponible",
+            rpen.clasificar("Unknown command: foo", null) == io.github.labandita.glreborn.core.Capacidad.Estado.NO)
+        check("sin permiso se dice sin permiso",
+            rpen.clasificar("Permission denial: writing to settings", null) == io.github.labandita.glreborn.core.Capacidad.Estado.SIN_PERMISO)
+        check("si el valor no queda, es limitado, no completo",
+            rpen.clasificar("0", "1") == io.github.labandita.glreborn.core.Capacidad.Estado.LIMITADO)
+        check("si queda el valor pedido, es completo",
+            rpen.clasificar("1", "1") == io.github.labandita.glreborn.core.Capacidad.Estado.COMPLETO)
+        check("sin valor esperado, responder ya es completo",
+            rpen.clasificar("lo que sea", null) == io.github.labandita.glreborn.core.Capacidad.Estado.COMPLETO)
+        check("todas las pruebas de penetración llevan comando", rpen.PRUEBAS.all { it.second.isNotBlank() })
+        check("y ninguna promete root sin probarlo", rpen.PRUEBAS.any { it.second == "su -c id" })
+    }
+
+    println()
+    println("── ranking AnTuTu ──")
+    run {
+        // El archivo va dentro del APK y tiene que estar completo: 50 del ranking y los citados.
+        val f = listOf(
+            "src/main/assets/datos/antutu.json",
+            "app/src/main/assets/datos/antutu.json",
+        ).map { java.io.File(it) }.firstOrNull { it.exists() }
+        check("el ranking viaja dentro del APK", f != null)
+        if (f != null) {
+            val raiz = org.json.JSONObject(f.readText())
+            val top = raiz.getJSONArray("dispositivos")
+            check("están los 50 del ranking mundial", top.length() == 50, "${top.length()}")
+            check("el archivo declara su fuente", raiz.optString("url").contains("mobolist.net"))
+            check("y el día en que se copió", raiz.optString("consultado").matches(Regex("\\d{4}-\\d{2}-\\d{2}")))
+            // El primero tiene que ser el primero de la lista publicada: el orden no se toca.
+            check("el nº 1 es el que publica la página",
+                top.getJSONObject(0).optString("nombre") == "Honor Magic9 Pro Max")
+            var conPuntos = 0
+            var conDevice = 0
+            for (i in 0 until top.length()) {
+                val o = top.getJSONObject(i)
+                if (!o.isNull("antutu")) conPuntos++
+                if (o.optString("device").isNotBlank()) conDevice++
+            }
+            check("todos los del ranking tienen puntuación", conPuntos == 50, "$conPuntos")
+            check("y casi todos, código de dispositivo", conDevice >= 40, "$conDevice")
+            // Los que citó el usuario están, aunque no estén en el ranking.
+            val ademas = raiz.getJSONArray("ademas")
+            val nombres = (0 until ademas.length()).map { ademas.getJSONObject(it).optString("nombre") }
+            listOf("Xiaomi 13 Pro", "Galaxy S23 Ultra", "OnePlus 11", "Pixel 8",
+                "Redmi Note 12", "Realme 10 Pro", "Galaxy S10").forEach { n ->
+                check("está el $n que pidió el usuario", nombres.contains(n))
+            }
+            // Y la regla dura: sin código de dispositivo no se puede aplicar.
+            val sinDevice = io.github.labandita.glreborn.core.FichaAntutu(
+                0, "Inventado", "Marca", null, "", "", "", "", "", "", "Inventado", "", "",
+                "sin ficha",
+            )
+            val (perfilNulo, motivo) = io.github.labandita.glreborn.core.Antutu.perfil(sinDevice)
+            check("una ficha sin device no produce perfil", perfilNulo == null)
+            check("y se explica por qué", motivo.contains("código de dispositivo"))
+            val conDeviceUno = sinDevice.copy(device = "husky", chipset = "Tensor G3")
+            val (perfilOk, _) = io.github.labandita.glreborn.core.Antutu.perfil(conDeviceUno)
+            check("con device sí hay perfil", perfilOk != null && perfilOk.device == "husky")
+            check("y el perfil avisa de que no da rendimiento",
+                perfilOk != null && perfilOk.nota.contains("no le da su rendimiento"))
+            check("no se inventa la versión de OpenGL", perfilOk != null && perfilOk.openglEs.isBlank())
+        }
     }
 
     println()

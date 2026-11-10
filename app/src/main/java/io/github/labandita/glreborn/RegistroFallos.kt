@@ -39,6 +39,10 @@ object RegistroFallos {
                 appendLine(pila.take(6000))
             }
             fichero(c).writeText(texto)
+            // Y una línea en el registro de errores, que es el que se exporta al cerrar.
+            io.github.labandita.glreborn.core.RegistroErrores.anotar(
+                c, "FATAL", contexto, "${t.javaClass.name}: ${t.message}",
+            )
         }
     }
 
@@ -66,5 +70,5 @@ object RegistroFallos {
 
 /** La versión, en un sitio, para que el registro no mienta. */
 object Build {
-    const val VERSION_REBORN = "1.11.0"
+    const val VERSION_REBORN = "1.12.0"
 }

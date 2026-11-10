@@ -42,12 +42,15 @@ enum class Pestana(val destino: Destino, val titulo: String) {
     HISTORIAL(Destino.DATOS, "Historial"),
     APLICADO(Destino.DATOS, "Aplicado"),
     DISPOSITIVOS(Destino.DATOS, "Dispositivos"),
+    RANKING(Destino.DATOS, "Ranking"),
 
     // Ayuda
     COMPATIBILIDAD(Destino.AYUDA, "Compat."),
     DIAGNOSTICO(Destino.AYUDA, "Diagnóstico"),
     LIMITES(Destino.AYUDA, "Límites"),
     FUENTES(Destino.AYUDA, "Fuentes"),
+    DIAGNOSTICO_AUTO(Destino.AYUDA, "Autom."),
+    PENETRACION(Destino.AYUDA, "Penetración"),
 }
 
 object Navegacion {

@@ -53,6 +53,22 @@ fun PantallaPrincipal(
     onProbarCompatibilidad: () -> Unit,
     fichas: List<Ficha>,
     movimientos: List<Movimiento>,
+    // ── 1.12.0 y 1.13.0: auto-diagnóstico, ranking y penetración
+    diagnostico: DiagnosticoCompleto? = null,
+    perfilDiagnostico: PerfilDiagnostico = PerfilDiagnostico(),
+    midiendo: Boolean = false,
+    onMedir: () -> Unit = {},
+    onPerfilDiagnostico: (PerfilDiagnostico) -> Unit = {},
+    rutasInforme: List<Pair<String, String>> = emptyList(),
+    onGuardarInforme: () -> Unit = {},
+    ranking: List<FichaAntutu> = emptyList(),
+    rankingAdemas: List<FichaAntutu> = emptyList(),
+    rankingConsultado: String = "",
+    onAplicarRanking: (FichaAntutu) -> Unit = {},
+    onCrearPerfilRanking: (FichaAntutu) -> Unit = {},
+    capacidades: List<Capacidad> = emptyList(),
+    resumenPenetracion: String = "",
+    onProbarPenetracion: () -> Unit = {},
     onDeshacerRegistro: () -> Unit,
     onPanel: (String) -> Unit,
     datosSonda: Sonda.Datos?,
@@ -991,6 +1007,43 @@ fun PantallaPrincipal(
                     }
                 }
 
+                Pestana.DIAGNOSTICO_AUTO -> {
+                    item {
+                        ContenidoDiagnostico(
+                            diag = diagnostico,
+                            perfil = perfilDiagnostico,
+                            corriendo = midiendo,
+                            onCorrer = onMedir,
+                            onPerfil = onPerfilDiagnostico,
+                            rutas = rutasInforme,
+                            onGuardar = onGuardarInforme,
+                        )
+                    }
+                }
+
+                Pestana.RANKING -> {
+                    item {
+                        ContenidoRanking(
+                            top = ranking,
+                            ademas = rankingAdemas,
+                            consultado = rankingConsultado,
+                            onAplicar = onAplicarRanking,
+                            onCrearPerfil = onCrearPerfilRanking,
+                        )
+                    }
+                }
+
+                Pestana.PENETRACION -> {
+                    item {
+                        ContenidoPenetracion(
+                            capacidades = capacidades,
+                            resumen = resumenPenetracion,
+                            sinShell = !hayShell,
+                            onProbar = onProbarPenetracion,
+                        )
+                    }
+                }
+
                 Pestana.HISTORIAL -> {
                     item {
                         Aviso(
@@ -1230,7 +1283,7 @@ internal fun Etiqueta(t: String) {
 }
 
 @Composable
-private fun Aviso(texto: String, color: Color) {
+internal fun Aviso(texto: String, color: Color) {
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
             .background(color.copy(alpha = 0.10f)).padding(12.dp),
