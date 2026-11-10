@@ -30,6 +30,13 @@ for apk in archivos:
     if firmado:
         assert firma.returncode == 0, "Firma APK inválida"
         certificados = re.findall(r"Signer #\d+ certificate SHA-256 digest: ([a-fA-F0-9]+)", firma.stdout)
+        # Diagnóstico sin secretos: la huella de un certificado es pública (va en cada APK).
+        if certificados != [CERTIFICADO]:
+            print("CERT_ENCONTRADOS=" + ",".join(certificados), flush=True)
+            print("CERT_ESPERADO=" + CERTIFICADO, flush=True)
+            print("APKSIGNER_RC=" + str(firma.returncode), flush=True)
+            print("APKSIGNER_SALIDA=" + firma.stdout.replace("\n", " | ")[:800], flush=True)
+            print("APKSIGNER_ERR=" + firma.stderr.replace("\n", " | ")[:400], flush=True)
         assert certificados == [CERTIFICADO], "La firma no corresponde a las versiones actuales"
         assert "UNSIGNED" not in apk.name
     else:
