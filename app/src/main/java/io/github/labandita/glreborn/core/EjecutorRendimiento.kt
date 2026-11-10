@@ -1,87 +1,81 @@
 package io.github.labandita.glreborn.core
 
-/**
- * Ejecuta las acciones de [Rendimiento] con la shell y **comprueba** el resultado.
- *
- * Contrato, igual que en el resto de la app: no se dice «aplicado» por haberlo pedido.
- * Se ejecuta, se lee el estado con el comando de comprobación, y se informa de lo que
- * devolvió el sistema. Si no coincide con lo esperado, se dice que no se pudo —aunque la
- * orden no hubiera dado error.
- */
-class EjecutorRendimiento(
-    private val shell: io.github.labandita.glreborn.shizuku.Shell,
+import io.github.labandita.glreborn.shizuku.Shell
+
+/** Ejecuta órdenes y conserva errores. Una orden aceptada no equivale a restaurar el estado original. */
+class EjecutorRendimiento internal constructor(
+    private val disponible: () -> Boolean,
+    private val correr: (String) -> Shell.Salida?,
+    private val sdk: Int,
     private val aplicado: Aplicado?,
+    private val modoFijo: (Boolean) -> Resultado,
 ) {
+    constructor(shell: Shell, aplicado: Aplicado?) : this(
+        shell::disponible, { shell.correr(it) }, android.os.Build.VERSION.SDK_INT,
+        aplicado, { Sistema(shell).modoRendimiento(it) },
+    )
+
+    /** La misma barrera rige aplicar y revertir, también si se invocan fuera de la UI. */
+    private fun validar(accion: Rendimiento.Accion, paquete: String?): Resultado? = when {
+        !disponible() -> Resultado(false, Via.NINGUNA, "Sin Shizuku disponible no se ejecutó ninguna orden.")
+        accion.necesitaRoot -> Resultado(false, Via.NINGUNA, "Esta acción necesita root; esta vía no lo presupone.")
+        sdk < accion.androidMinimo -> Resultado(false, Via.SHIZUKU,
+            "Esta acción requiere API ${accion.androidMinimo}; el dispositivo declara API $sdk.")
+        Rendimiento.necesitaPaquete(accion) && !Rendimiento.paqueteValido(paquete) ->
+            Resultado(false, Via.SHIZUKU, "Elige un nombre de paquete válido; no se ejecutó ninguna orden.")
+        else -> null
+    }
+
+    private fun ejecutar(comando: String, lineas: MutableList<String>): Shell.Salida? {
+        lineas += "$ $comando"
+        val r = correr(comando)
+        lineas += "código: ${r?.codigo ?: "sin respuesta"}"
+        lineas += "→ ${r?.texto?.take(2000)?.ifBlank { "sin salida" } ?: "sin respuesta"}"
+        if (r?.seAgotoElTiempo == true) lineas += "Tiempo agotado: no se conoce el estado final."
+        return r
+    }
+
     fun aplicar(accion: Rendimiento.Accion, paquete: String? = null): Resultado {
-        if (!shell.disponible()) {
-            return Resultado(false, Via.NINGUNA,
-                "Sin Shizuku con permiso no se puede ejecutar nada de esto.")
-        }
-        if (accion.necesitaRoot) {
-            return Resultado(false, Via.NINGUNA,
-                "«${accion.nombre}» necesita root. Esta app no finge tenerlo.")
-        }
-        if (Rendimiento.necesitaPaquete(accion) && paquete.isNullOrBlank()) {
-            return Resultado(false, Via.NINGUNA,
-                "«${accion.nombre}» actúa sobre una app concreta: elige una primero.")
-        }
-
-        if (accion.id == "rendimiento-fijo") return Sistema(shell).modoRendimiento(true)
-
+        validar(accion, paquete)?.let { return it }
+        if (accion.id == "rendimiento-fijo") return modoFijo(true)
         val lineas = mutableListOf<String>()
-        Rendimiento.comando(accion, paquete).forEach { comando ->
-            val r = shell.correr(comando)
-            lineas += "$ $comando"
-            lineas += "→ ${r?.texto?.take(200)?.ifBlank { "sin salida" } ?: "sin respuesta"}"
+        val ordenes = Rendimiento.comando(accion, paquete)
+        if (ordenes.isEmpty()) return Resultado(false, Via.SHIZUKU, "No hay órdenes que aplicar.")
+        for (comando in ordenes) {
+            val r = ejecutar(comando, lineas)
+            if (r?.ok != true || r.seAgotoElTiempo) return Resultado(false, Via.SHIZUKU,
+                "Falló o no terminó una orden. Se detuvo la secuencia; puede haber cambios parciales. " +
+                    "No se declara aplicada ni se infiere que el fabricante la ignore.", lineas)
         }
-
-        val leido = shell.correr(accion.comprobar)?.texto
-        lineas += "$ ${accion.comprobar}"
-        lineas += "→ ${leido?.take(200)?.ifBlank { "sin salida" } ?: "sin respuesta"}"
-
-        val ok = Rendimiento.comprueba(leido, accion.esperado)
-        if (ok) {
-            aplicado?.anotar(
-                paquete ?: "sistema",
-                accion.nombre,
-                "${accion.queHace} Se comprobó con `${
-                    accion.comprobar.replace("%PAQUETE%", paquete.orEmpty())
-                }` y devolvió ${accion.esperado}.",
-                reversible = true,
-            )
-        }
-        return Resultado(
-            ok = ok,
-            via = Via.SHIZUKU,
-            detalle = if (ok)
-                "«${accion.nombre}» aplicado y comprobado: el sistema devolvió " +
-                    "${accion.esperado}."
-            else
-                "Se ejecutó «${accion.nombre}», pero la comprobación no dio " +
-                    "${accion.esperado}: el teléfono puede no admitirlo. Mira las líneas " +
-                    "de abajo antes de dar nada por hecho.",
-            lineas = lineas,
+        val comprobacion = accion.comprobar.replace("%PAQUETE%", paquete.orEmpty())
+        val respuesta = ejecutar(comprobacion, lineas)
+        val ok = respuesta?.ok == true && !respuesta.seAgotoElTiempo &&
+            Rendimiento.comprueba(respuesta.texto, accion.esperado)
+        if (ok) aplicado?.anotar(
+            paquete ?: "sistema", accion.nombre,
+            "Lectura confirmada con `$comprobacion`: ${accion.esperado}. No es una medición de rendimiento.",
+            reversible = accion.revertir.isNotEmpty(),
         )
+        return Resultado(ok, Via.SHIZUKU,
+            if (ok) "Órdenes aceptadas y lectura esperada confirmada. Esto no mide una mejora física."
+            else "No se confirmó la lectura esperada. Puede haber cambios parciales; revisa código y salida.",
+            lineas)
     }
 
     fun revertir(accion: Rendimiento.Accion, paquete: String? = null): Resultado {
-        if (!shell.disponible()) {
-            return Resultado(false, Via.NINGUNA, "Sin Shizuku no se puede deshacer.")
-        }
-        if (accion.id == "rendimiento-fijo") return Sistema(shell).modoRendimiento(false)
-
+        validar(accion, paquete)?.let { return it }
+        if (accion.id == "rendimiento-fijo") return modoFijo(false)
         val lineas = mutableListOf<String>()
-        Rendimiento.revertir(accion, paquete).forEach { comando ->
-            val r = shell.correr(comando)
-            lineas += "$ $comando"
-            lineas += "→ ${r?.texto?.take(200)?.ifBlank { "sin salida" } ?: "sin respuesta"}"
+        val ordenes = Rendimiento.revertir(accion, paquete)
+        if (ordenes.isEmpty()) return Resultado(false, Via.SHIZUKU, "No hay órdenes de reversión.")
+        for (comando in ordenes) {
+            val r = ejecutar(comando, lineas)
+            if (r?.ok != true || r.seAgotoElTiempo) return Resultado(false, Via.SHIZUKU,
+                "Falló o no terminó una orden de reversión. Puede haber cambios parciales; " +
+                    "no se declara restaurado el dispositivo.", lineas)
         }
-        return Resultado(
-            ok = true,
-            via = Via.SHIZUKU,
-            detalle = "«${accion.nombre}» revertido. Los comandos ejecutados están abajo: " +
-                "si alguno falló, lo verás ahí.",
-            lineas = lineas,
-        )
+        return Resultado(true, Via.SHIZUKU,
+            "Órdenes de reversión aceptadas. No se verificó el estado original: los valores " +
+                "predeterminados del catálogo no equivalen necesariamente a tus valores anteriores.", lineas)
     }
 }

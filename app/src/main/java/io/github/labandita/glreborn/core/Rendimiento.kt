@@ -227,7 +227,11 @@ object Rendimiento {
 
     /** ¿Esta acción necesita un paquete concreto para tener sentido? */
     fun necesitaPaquete(accion: Accion): Boolean =
-        accion.aplicar.any { it.contains("%PAQUETE%") }
+        (accion.aplicar + accion.revertir + accion.comprobar).any { it.contains("%PAQUETE%") }
+
+    /** Se inserta sin comillas en órdenes shell: sólo admitimos identificadores Android ASCII. */
+    fun paqueteValido(paquete: String?): Boolean =
+        paquete?.matches(Regex("[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*")) == true
 
     /** Aviso de riesgo, en una línea, para ponerlo delante del botón. */
     fun avisoDeRiesgo(accion: Accion): String = when (accion.riesgo) {

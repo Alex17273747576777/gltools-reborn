@@ -624,6 +624,7 @@ run {
 // Rendimiento: los comandos, sus comprobaciones y sus reversiones
 // ─────────────────────────────────────────────────────────────────────────────
 run {
+    pruebasEjecucionRendimiento()
     println("\nAcciones de rendimiento (lo que hacen los módulos, sin root)")
 
     check("hay acciones disponibles", Rendimiento.catalogo.isNotEmpty())
