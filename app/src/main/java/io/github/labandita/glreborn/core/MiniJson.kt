@@ -210,3 +210,4 @@ object MiniJson {
     fun numero(m: Map<String, Any?>, clave: String): Double? = m[clave] as? Double
     fun entero(m: Map<String, Any?>, clave: String): Int? = (m[clave] as? Double)?.toInt()
     fun booleano(m: Map<String, Any?>, clave: String): Boolean? = m[clave] as? Boolean
+}
