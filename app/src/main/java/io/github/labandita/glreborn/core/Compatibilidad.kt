@@ -226,7 +226,7 @@ class Compatibilidad(private val shell: Shell) {
             texto.contains("Unknown command") -> Prueba(nombre, Prueba.Estado.FALLA,
                 "este Android no tiene la orden del modo fijo: `cmd power` contestó «Unknown command»")
             else -> Prueba(nombre, Prueba.Estado.FALLA,
-                "código $codigo: ${texto.lineSequence().firstOrNull().orEmpty().take(120).ifBlank { "sin detalle" }}")
+                "código $codigo: ${texto.lineSequence().firstOrNull().orEmpty().take(120).ifBlank { "sin texto; código disponible arriba" }}")
         }
     }
 
