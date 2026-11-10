@@ -119,7 +119,7 @@ object MiniJson {
                             val n = hex.toIntOrNull(16) ?: fallo(t, i[0], "escape \\u no válido: $hex")
                             sb.append(n.toChar()); i[0] += 4
                         }
-                        else -> fallo(t, i[0], "escape desconocido: \\$e")
+                        else -> fallo(t, i[0], "escape desconocido: " + e)
                     }
                     i[0]++
                 }

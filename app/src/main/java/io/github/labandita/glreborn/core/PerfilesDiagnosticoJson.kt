@@ -136,17 +136,29 @@ object ReglasPerfilesJson {
         val raiz = try {
             MiniJson.objeto(MiniJson.leer(texto))
         } catch (e: Exception) {
-            return deFabrica() to listOf("el fichero de perfiles no es JSON válido: ${e.message}. Se usan los de fábrica") to true
+            return Triple(
+                deFabrica(),
+                listOf("el fichero de perfiles no es JSON válido: ${e.message}. Se usan los de fábrica"),
+                true,
+            )
         }
         val bruto = raiz[CLAVE_PERFILES]
-            ?: return deFabrica() to listOf("el fichero no tiene la lista «perfiles»: se usan los de fábrica") to true
+            ?: return Triple(
+                deFabrica(),
+                listOf("el fichero no tiene la lista «perfiles»: se usan los de fábrica"),
+                true,
+            )
         val lista = try {
             MiniJson.lista(bruto)
         } catch (e: Exception) {
-            return deFabrica() to listOf("«perfiles» no es una lista: ${e.message}") to true
+            return Triple(deFabrica(), listOf("«perfiles» no es una lista: ${e.message}"), true)
         }
         if (lista.isEmpty()) {
-            return deFabrica() to listOf("la lista de perfiles estaba vacía: se usan los tres de fábrica") to true
+            return Triple(
+                deFabrica(),
+                listOf("la lista de perfiles estaba vacía: se usan los tres de fábrica"),
+                true,
+            )
         }
 
         val salida = ArrayList<PerfilGuardado>()
@@ -176,7 +188,11 @@ object ReglasPerfilesJson {
             salida += PerfilGuardado(nombre, p, activo = MiniJson.booleano(m, "activo") ?: false)
         }
         if (salida.isEmpty()) {
-            return deFabrica() to (avisos + "ningún perfil era válido: se usan los de fábrica") to true
+            return Triple(
+                deFabrica(),
+                avisos + "ningún perfil era válido: se usan los de fábrica",
+                true,
+            )
         }
         if (salida.size > MAX_PERFILES) {
             avisos += "había ${salida.size} perfiles y el máximo es $MAX_PERFILES: se quedan los primeros"
@@ -188,7 +204,7 @@ object ReglasPerfilesJson {
             vistos += n
             if (n != p.nombre) { avisos += "«${p.nombre}» estaba repetido: se llamó «$n»"; p.copy(nombre = n) } else p
         }
-        return normalizarActivo(conNombres) to avisos to false
+        return Triple(normalizarActivo(conNombres), avisos, false)
     }
 
     /** El JSON de un solo perfil, para exportarlo o pegarlo en un chat. */
