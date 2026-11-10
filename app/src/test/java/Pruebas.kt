@@ -1342,6 +1342,58 @@ run {
         check("Home no dibuja cajas por todas partes", cajas <= 1, "$cajas bordes")
     }
 
+
+    // ── 1.9.1: tipografía propia y los procedimientos que se vigilan a sí mismos ──
+    println()
+    println("── no parecer el sistema operativo ──")
+    val temaFuente2 = listOf(
+        "app/src/main/java/io/github/labandita/glreborn/ui/Tema.kt",
+        "src/main/java/io/github/labandita/glreborn/ui/Tema.kt",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (temaFuente2 != null) {
+        val te = temaFuente2.readText()
+        // La fuente del sistema es la razón número uno por la que una app parece una web.
+        check("el tema declara una familia tipográfica propia", te.contains("FontFamily("))
+        check("usa fuentes empaquetadas, no del sistema", te.contains("R.font."))
+        check("la escala de tipos tiene al menos 6 pasos",
+            Regex("fontSize = [0-9]+\\.sp").findAll(te).map { it.value }.toSet().size >= 6)
+        check("el texto principal no baja de 10 sp",
+            Regex("fontSize = ([0-9]+)\\.sp").findAll(te).map { it.groupValues[1].toInt() }
+                .none { it < 10 })
+    }
+    // Las fuentes tienen que estar de verdad en res/font, con su licencia.
+    val dirFuentes = listOf("app/src/main/res/font", "src/main/res/font")
+        .map { java.io.File(it) }.firstOrNull { it.isDirectory }
+    check("hay al menos 3 fuentes empaquetadas", dirFuentes != null && (dirFuentes.listFiles()?.size ?: 0) >= 3)
+    val licencia = listOf(
+        "app/src/main/assets/OFL-AtkinsonNext.txt",
+        "src/main/assets/OFL-AtkinsonNext.txt",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    check("la licencia de la fuente viaja dentro del APK", licencia != null)
+    if (licencia != null) {
+        check("la licencia es de uso libre (SIL OFL)",
+            licencia.readText().contains("SIL Open Font License"))
+    }
+
+    // Los procedimientos son entregables: si faltan, no existen.
+    println()
+    println("── procedimientos ──")
+    val procs = listOf(
+        "01-censar-catalogo-appteka.py",
+        "02-elegir-y-desmontar.sh",
+        "03-cerrar-tramo.sh",
+        "04-incidencias.sh",
+        "05-diseno-imitar-y-mejorar.md",
+    )
+    val dirProcs = listOf("normas/procedimientos", "../normas/procedimientos")
+        .map { java.io.File(it) }.firstOrNull { it.isDirectory }
+    val encontrados = dirProcs?.listFiles()?.map { it.name } ?: emptyList()
+    if (dirProcs != null) {
+        procs.forEach { p ->
+            check("existe el procedimiento $p", encontrados.contains(p))
+        }
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")
