@@ -1310,6 +1310,38 @@ run {
             "src/main/java/io/github/labandita/glreborn/ui/PantallaFallo.kt",
         ).any { java.io.File(it).exists() })
 
+
+    // ── 1.9.0: los patrones que se copiaron de apps que sí están bien hechas ──
+    println()
+    println("── patrones de apps reales ──")
+    val homeFuente = listOf(
+        "app/src/main/java/io/github/labandita/glreborn/ui/Home.kt",
+        "src/main/java/io/github/labandita/glreborn/ui/Home.kt",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (homeFuente != null) {
+        val h = homeFuente.readText()
+        // El fallo que cerró la app una vez: dos «lista y desplaza» anidados.
+        // Se busca la LLAMADA, no la palabra: el comentario que explica el fallo la nombra.
+        check("Home no anida un LazyColumn dentro de otro scroller",
+            !Regex("Lazy(Column|Row)\\s*\\(").containsMatchIn(h))
+        check("Home se desplaza con un solo gesto", h.contains("verticalScroll(rememberScrollState())"))
+        // Carrusel de píldoras (patrón de Hardware Monitor).
+        check("hay carrusel de píldoras con una encendida",
+            h.contains("horizontalScroll(rememberScrollState())") &&
+                h.contains("PildorasMedidor") && h.contains("RoundedCornerShape(50)"))
+        // Rejilla de baldosas con icono (patrón de Androoster).
+        check("las acciones son baldosas con icono dibujado",
+            Regex("Baldosa\\(").findAll(h).count() >= 4 && h.contains("interno") == false)
+        check("las baldosas llevan icono, no texto suelto", h.contains("icono = {"))
+        // Cada píldora tiene datos detrás: cinco medidores, no cinco huecos.
+        check("el carrusel no promete más de lo que hay",
+            Regex("val nombres = listOf\\(").containsMatchIn(h) &&
+                h.split("val nombres = listOf").getOrNull(1)?.contains("Sonda") == true)
+        // Nada de cajas del mismo peso: la Home usa líneas y huecos, no bordes por todas partes.
+        val cajas = Regex("\\.border\\(").findAll(h).count()
+        check("Home no dibuja cajas por todas partes", cajas <= 1, "$cajas bordes")
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")
