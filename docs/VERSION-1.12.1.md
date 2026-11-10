@@ -25,3 +25,6 @@ Un certificado público o una contraseña solos no recuperan la clave privada. S
 
 ## Límites
 La compilación y las pruebas simuladas no equivalen a comprobar el equipo de la captura. No se garantiza rendimiento máximo, persistencia de privilegios, root ni soporte de la ROM. El modo fijo es de pruebas y no se autoactiva al arrancar.
+
+## Secret único GLTOOLS (JSON)
+También se admite `GLTOOLS` como objeto JSON con los campos exactos `REBORN_KEYSTORE_BASE64`, `REBORN_STORE_PASS`, `REBORN_KEY_ALIAS`, `REBORN_KEY_PASS`, todos de tipo string y no vacíos. No pegar aquí sus valores. Tiene prioridad sobre los Secrets separados. Se rechazan JSON/campos/base64 inválidos y claves duplicadas, sin fallback silencioso ni registrar el contenido. Las contraseñas se enmascaran antes de Gradle. La clave se escribe sólo en el runner temporal, con permisos 0600, y se elimina al finalizar. Leer el JSON no acredita que la clave sea correcta: ambos APK deben superar apksigner y coincidir con el certificado esperado antes de publicar.
