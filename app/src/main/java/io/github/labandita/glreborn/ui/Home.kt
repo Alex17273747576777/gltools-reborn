@@ -146,7 +146,8 @@ fun PantallaHome(
             1 -> PanelSonda(datosSonda)
             2 -> PanelArquitectura(datosSonda)
             3 -> PanelSistema(datosSonda, actual, resumenCompat)
-            else -> PanelApps(apps, congeladas, fichas)
+            4 -> PanelApps(apps, congeladas, fichas)
+            else -> PanelRecursos()
         }
 
         // ── 6. ACCIONES. Rejilla de baldosas, el patrón de Androoster: se pulsan sin leer
@@ -245,7 +246,7 @@ fun PantallaHome(
 internal fun PildorasMedidor(
     elegido: Int,
     onMedidor: (Int) -> Unit,
-    nombres: List<Any> = listOf("Identidad", "Sonda", "Arquitectura", "Sistema", "Apps"),
+    nombres: List<Any> = listOf("Identidad", "Sonda", "Arquitectura", "Sistema", "Apps", "Recursos"),
 ) {
     Row(
         Modifier
@@ -382,6 +383,116 @@ private fun PanelSistema(d: Sonda.Datos?, actual: Map<String, String>, compat: S
 }
 
 /** Apps y rendimiento: las dos cifras que se pueden tocar sin root. */
+/**
+ * Recursos: lo que le queda al teléfono. Memoria y almacenamiento con una barra cada uno.
+ *
+ * La barra no es adorno: es la forma más rápida de decir «no te queda». Se tiñe de ámbar al 75 %
+ * y de rojo al 90 %, con los mismos colores que el resto de la app para que signifiquen lo mismo.
+ */
+@Composable
+private fun PanelRecursos() {
+    val contexto = androidx.compose.ui.platform.LocalContext.current
+    // Se lee una vez por entrada al panel, no en cada repintado.
+    val memoria = remember { io.github.labandita.glreborn.core.Recursos.memoria(contexto) }
+    val almacen = remember { io.github.labandita.glreborn.core.Recursos.almacenamiento(contexto) }
+    val externo = remember { io.github.labandita.glreborn.core.Recursos.almacenamientoExterno() }
+
+    Column(Modifier.fillMaxWidth()) {
+        memoria?.let { m ->
+            BarraRecurso(
+                titulo = "Memoria",
+                usado = m.usadaBytes,
+                total = m.totalBytes,
+                detalle = "${io.github.labandita.glreborn.core.Recursos.legible(m.libreBytes)} libres " +
+                    "de ${io.github.labandita.glreborn.core.Recursos.legible(m.totalBytes)}",
+                porcentaje = m.porcentajeUsado,
+            )
+            m.aviso?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.ambar)
+            }
+        } ?: Text(
+            "El sistema no ha dado la memoria. No se estima: no se enseña.",
+            fontSize = 11.5.sp, lineHeight = 17.sp, color = Cristal.textoTenue,
+        )
+
+        almacen?.let { a ->
+            Spacer(Modifier.height(14.dp))
+            BarraRecurso(
+                titulo = "Almacenamiento",
+                usado = a.totalBytes - a.libreBytes,
+                total = a.totalBytes,
+                detalle = "${io.github.labandita.glreborn.core.Recursos.legible(a.libreBytes)} libres " +
+                    "de ${io.github.labandita.glreborn.core.Recursos.legible(a.totalBytes)}",
+                porcentaje = a.porcentajeUsado,
+            )
+            a.aviso?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.ambar)
+            }
+        }
+        externo?.let { e ->
+            Spacer(Modifier.height(10.dp))
+            FilaDato(
+                "Almacenamiento externo",
+                "${io.github.labandita.glreborn.core.Recursos.legible(e.libreBytes)} libres",
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Lectura con las APIs públicas del sistema. La memoria de cada proceso y la de la " +
+                "GPU no se pueden leer sin root, así que no aparecen.",
+            fontSize = 10.5.sp, lineHeight = 16.sp, color = Cristal.textoTenue,
+        )
+    }
+}
+
+/** Una barra de recurso: título, cifra, y una barra que cambia de color según lo llena que esté. */
+@Composable
+private fun BarraRecurso(
+    titulo: String,
+    usado: Long,
+    total: Long,
+    detalle: String,
+    porcentaje: Int,
+) {
+    val color = when {
+        porcentaje >= 90 -> Cristal.rojo
+        porcentaje >= 75 -> Cristal.ambar
+        else -> Cristal.marca
+    }
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(titulo, fontSize = 12.sp, color = Cristal.textoSuave, modifier = Modifier.weight(1f))
+            Text(
+                "$porcentaje %",
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace,
+                color = color,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Cristal.superficieMasAlta),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth((porcentaje / 100f).coerceIn(0f, 1f))
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(color),
+            )
+        }
+        Spacer(Modifier.height(5.dp))
+        Text(detalle, fontSize = 11.sp, color = Cristal.textoTenue)
+    }
+}
+
 @Composable
 private fun PanelApps(apps: Int, congeladas: Int, fichas: Int) {
     Column(Modifier.fillMaxWidth()) {

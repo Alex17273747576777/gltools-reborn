@@ -1684,6 +1684,49 @@ run {
         }
     }
 
+
+    // ── 1.9.9: memoria y almacenamiento en la portada ────────────────────────
+    //
+    // Era el dato que faltaba para decidir si aplicar algo, y el que más se mira en un teléfono
+    // de 4 GB. Se lee con APIs públicas; lo que no se puede leer sin root NO se estima.
+    println()
+    println("── recursos del teléfono ──")
+    run {
+        val r = io.github.labandita.glreborn.core.Recursos
+        // El formato tiene que ser legible y no mentir con los decimales.
+        check("los bytes se leen de un vistazo", r.legible(512) == "512 B")
+        check("los megabytes no llevan decimales de más", r.legible(812L * 1024 * 1024) == "812 MB")
+        check("los gigabytes llevan un decimal", r.legible(3L * 1024 * 1024 * 1024 + 100L * 1024 * 1024) == "3.1 GB")
+
+        // Los porcentajes, en los bordes que importan.
+        val vacio = io.github.labandita.glreborn.core.Recursos.Memoria(0, 0, false, 0)
+        check("sin datos no se inventa un porcentaje", vacio.porcentajeUsado == 0)
+        val lleno = io.github.labandita.glreborn.core.Recursos.Memoria(4_000, 200, false, 0)
+        check("al 95 % avisa", lleno.porcentajeUsado == 95 && lleno.aviso != null)
+        val bajo = io.github.labandita.glreborn.core.Recursos.Memoria(4_000, 3_000, true, 500)
+        check("si el sistema dice «memoria baja», se dice", bajo.aviso!!.contains("cerrar apps"))
+        val holgado = io.github.labandita.glreborn.core.Recursos.Memoria(4_000, 2_000, false, 500)
+        check("con memoria de sobra no se avisa de nada", holgado.aviso == null)
+
+        val apurado = io.github.labandita.glreborn.core.Recursos.Almacenamiento(100L * 1024 * 1024 * 1024, 300L * 1024 * 1024, false)
+        check("con menos de 500 MB avisa", apurado.aviso!!.contains("500 MB"))
+        val normal = io.github.labandita.glreborn.core.Recursos.Almacenamiento(100L * 1024 * 1024 * 1024, 50L * 1024 * 1024 * 1024, false)
+        check("con espacio de sobra no avisa", normal.aviso == null)
+
+        // Y la portada tiene que enseñarlo, con su barra.
+        val home = listOf(
+            "app/src/main/java/io/github/labandita/glreborn/ui/Home.kt",
+            "src/main/java/io/github/labandita/glreborn/ui/Home.kt",
+        ).map { java.io.File(it) }.firstOrNull { it.exists() }
+        if (home != null) {
+            val h = home.readText()
+            check("la portada tiene el medidor de recursos", h.contains("PanelRecursos"))
+            check("con barra, no sólo un número", h.contains("BarraRecurso"))
+            check("y dice que lo que no se puede leer no se estima",
+                h.contains("no se pueden leer sin root"))
+        }
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

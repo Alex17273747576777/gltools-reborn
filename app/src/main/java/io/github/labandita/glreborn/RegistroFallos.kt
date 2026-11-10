@@ -66,5 +66,5 @@ object RegistroFallos {
 
 /** La versión, en un sitio, para que el registro no mienta. */
 object Build {
-    const val VERSION_REBORN = "1.9.8"
+    const val VERSION_REBORN = "1.9.9"
 }
