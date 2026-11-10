@@ -61,6 +61,8 @@ fun PantallaPrincipal(
     onPerfilDiagnostico: (PerfilDiagnostico) -> Unit = {},
     rutasInforme: List<Pair<String, String>> = emptyList(),
     onGuardarInforme: () -> Unit = {},
+    puedeCompartirInforme: Boolean = false,
+    onCompartirInforme: () -> Unit = {},
     ranking: List<FichaAntutu> = emptyList(),
     rankingAdemas: List<FichaAntutu> = emptyList(),
     rankingConsultado: String = "",
@@ -1017,6 +1019,8 @@ fun PantallaPrincipal(
                             onPerfil = onPerfilDiagnostico,
                             rutas = rutasInforme,
                             onGuardar = onGuardarInforme,
+                            puedeCompartir = puedeCompartirInforme,
+                            onCompartir = onCompartirInforme,
                         )
                     }
                 }

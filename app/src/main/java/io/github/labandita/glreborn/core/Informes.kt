@@ -33,6 +33,26 @@ data class ResultadoInforme(
 object Informes {
 
     const val CANAL = "reborn-informes"
+
+    /**
+     * Las rutas del último informe generado, para poder compartirlo después sin volver a medir.
+     *
+     * Vive en memoria a propósito: un informe es de la sesión en la que se hizo. Si la app se
+     * cierra del todo, el fichero sigue en Documentos —donde el usuario lo puede abrir— y esta
+     * lista vacía sólo significa «no hay nada recién generado que compartir», que es la verdad.
+     */
+    @Volatile
+    private var ultimasRutas: List<String> = emptyList()
+
+    fun ultimas(): List<String> = ultimasRutas
+
+    /** Guarda las rutas en la carpeta de la app para poder compartirlas por `content://`. */
+    private fun aCarpetaPropia(context: Context, nombre: String, contenido: String): String? =
+        runCatching {
+            val archivo = File(context.filesDir, nombre)
+            archivo.writeText(contenido)
+            archivo.absolutePath
+        }.getOrNull()
     private const val ETIQUETA = "GLTools Reborn"
 
     /**
@@ -127,6 +147,14 @@ object Informes {
         if (falloTxt.isNotBlank()) fallos += "registro .txt" to falloTxt
         if (rutaMd.isNotBlank()) rutas += rutaMd
         if (rutaTxt.isNotBlank()) rutas += rutaTxt
+        // Copia interna con el mismo contenido: en Android 8 y 9 Documentos puede fallar, y el
+        // informe no debe quedarse sin poder salir del teléfono por eso.
+        val internoMd = aCarpetaPropia(context, "reborn-diagnostico-$sello.md", md)
+        val internoTxt = aCarpetaPropia(context, "reborn-errores-$sello.txt", txt)
+        ultimasRutas = listOfNotNull(
+            rutaMd.ifBlank { null }, rutaTxt.ifBlank { null }, internoMd, internoTxt,
+        ).distinct()
+
         if (rutaMd.isNotBlank() || rutaTxt.isNotBlank()) {
             avisar(
                 context,

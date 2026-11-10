@@ -261,6 +261,12 @@ private fun App(
     var perfilDiag by remember { mutableStateOf(PerfilDiagnostico()) }
     var midiendo by remember { mutableStateOf(false) }
     var rutasInforme by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    // Lo que se puede compartir: lo que acaba de generar esta pantalla, o lo que generó el
+    // cierre anterior de la app si sigue en disco.
+    var informeReciente by remember { mutableStateOf<List<String>>(emptyList()) }
+    // Abrir el selector de apps es cosa de una Activity, no de un Context cualquiera: aquí se
+    // tiene la de verdad, en vez de castear el contexto de Compose y arriesgarse a un ClassCast.
+    val contextoActividad = LocalContext.current as android.app.Activity
     var ranking by remember { mutableStateOf<List<FichaAntutu>>(emptyList()) }
     var rankingAdemas by remember { mutableStateOf<List<FichaAntutu>>(emptyList()) }
     var capacidades by remember { mutableStateOf<List<Capacidad>>(emptyList()) }
@@ -586,6 +592,20 @@ private fun App(
             }
         },
         rutasInforme = rutasInforme,
+        puedeCompartirInforme = informeReciente.isNotEmpty() || Informes.ultimas().isNotEmpty(),
+        onCompartirInforme = {
+            val rutas = informeReciente.ifEmpty { Informes.ultimas() }
+            val intent = Compartir.para(contextoActividad, rutas)
+            if (intent == null) {
+                resultado = Resultado(false, Via.NINGUNA,
+                    "No hay ningún informe en disco que compartir. Genera uno primero.")
+            } else {
+                runCatching { contextoActividad.startActivity(intent) }.onFailure {
+                    resultado = Resultado(false, Via.NINGUNA,
+                        "Android no encontró ninguna app para compartir: ${it.message}")
+                }
+            }
+        },
         onGuardarInforme = {
             alcance.launch {
                 val ctx = contexto.applicationContext
@@ -594,6 +614,7 @@ private fun App(
                 }
                 // Se enseña la ruta que devolvió el sistema, no la que se esperaba.
                 rutasInforme = r.rutas.map { it to "" } + r.fallos
+                informeReciente = r.rutas
                 resultado = if (r.huboArchivos && r.fallos.isEmpty())
                     Resultado(true, Via.NINGUNA, "Informes guardados: " + r.rutas.joinToString(" · "))
                 else if (r.huboArchivos)

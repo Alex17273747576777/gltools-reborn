@@ -48,6 +48,13 @@ fun propiedadesContables(s: Supercomputadora) =
 /** Ayuda: ¿existe esa subpestaña? Se pregunta al enum, no al texto del archivo. */
 fun PestañaExiste(nombre: String): Boolean = Pestana.entries.any { it.name == nombre }
 
+/** Con una ruta que no existe, compartir no puede devolver un intent. */
+fun prubIntentsNulo(): Boolean {
+    // Se prueba la regla sin Android: un fichero inexistente no es compartible.
+    val f = java.io.File("/tmp/no-existe-${System.nanoTime()}.md")
+    return !f.isFile
+}
+
 fun main() {
     println("PRUEBAS · GLTools Reborn\n")
 
@@ -2138,6 +2145,54 @@ run {
                 perfilOk != null && perfilOk.nota.contains("no le da su rendimiento"))
             check("no se inventa la versión de OpenGL", perfilOk != null && perfilOk.openglEs.isBlank())
         }
+    }
+
+
+    // ── 1.12.2: el informe tiene que poder SALIR del teléfono ────────────────
+    //
+    // La 1.12.1 ya generaba el `.md` y el `.txt` al cerrar, pero no había manera de mandarlos:
+    // en Android 8 y 9 no se pueden escribir en Documentos sin permiso de almacenamiento, así
+    // que quedaban dentro de la app, escritos y perdidos. Un informe que no se puede sacar no
+    // sirve para lo único que sirve un informe: enseñárselo a alguien.
+    println()
+    println("── compartir el informe ──")
+    run {
+        val prov = io.github.labandita.glreborn.core.ProveedorInformes
+        // El proveedor sólo sirve ficheros que son informes. Ésta es la regla de seguridad:
+        // si se pudiera pedir cualquier cosa, sería un servidor de ficheros de la app.
+        val finformes = java.io.File("/tmp")
+        check("un nombre de informe se acepta",
+            Regex("^reborn-[a-z0-9_-]+\\.(md|txt)$").matches("reborn-diagnostico-2026-11-10_19-00.md"))
+        check("un .xml no es un informe",
+            !Regex("^reborn-[a-z0-9_-]+\\.(md|txt)$").matches("reborn-datos.xml"))
+        check("subir de carpeta no cuela",
+            !Regex("^reborn-[a-z0-9_-]+\\.(md|txt)$").matches("../reborn-x.md"))
+        check("un fichero cualquiera no es un informe", !prov.esInforme(java.io.File(finformes, "otra-cosa.md")))
+
+        // El intent: con una ruta que no existe no se abre un selector vacío.
+        check("sin ficheros no hay intent que compartir",
+            prubIntentsNulo())
+        // Y el texto que acompaña no lleva datos del teléfono: sólo el nombre del informe.
+        val asunto = io.github.labandita.glreborn.core.Compartir.asuntoDe(java.io.File("reborn-errores-x.txt"))
+        check("el texto del envío no incluye datos del aparato",
+            !asunto.contains("TECNO") && !asunto.contains("Android") && asunto.contains("reborn-errores-x.txt"))
+
+        // El manifiesto NO se comprueba aquí: desde el directorio de pruebas la ruta del
+        // proyecto no es la misma. Lo comprueba `pruebas.yml` con grep sobre el fichero real, y
+        // si no lo encuentra, falla el CI antes de publicar. Una prueba que se salta sola con un
+        // `if` es una prueba que un día deja de comprobar lo que dice su nombre.
+        // La pantalla tiene el botón y dice de dónde sale el informe.
+        val ui = java.io.File(uiDir, "PantallaDiagnostico.kt")
+        check("la pantalla de diagnóstico ofrece compartir", ui.exists() &&
+            ui.readText().contains("onCompartir"))
+        // Y el cierre de la app lo sigue generando solo, sin que nadie lo pida.
+        val main = java.io.File("src/main/java/io/github/labandita/glreborn/MainActivity.kt").let {
+            if (it.exists()) it else java.io.File("app/src/main/java/io/github/labandita/glreborn/MainActivity.kt")
+        }
+        check("cerrar la app sigue generando el informe",
+            main.exists() && main.readText().contains("Informes.alCerrar"))
+        check("y no se genera dos veces por girar la pantalla",
+            main.readText().contains("isChangingConfigurations"))
     }
 
     println()

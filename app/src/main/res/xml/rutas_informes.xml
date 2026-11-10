@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Lo único que se puede compartir de esta app: sus propios informes.
+
+  `path="."` sobre la carpeta de ficheros de la app queda a propósito, porque los informes
+  también se guardan ahí cuando Android 8 y 9 no dejan escribir en Documentos. El proveedor
+  sólo entrega ficheros que existen y que se llaman como un informe: `InformesDeReborn` lo
+  comprueba antes de devolver nada. Ni datos de usuario, ni la lista de apps, ni las
+  propiedades del teléfono salen por aquí.
+-->
+<paths>
+    <files-path name="informes" path="." />
+</paths>

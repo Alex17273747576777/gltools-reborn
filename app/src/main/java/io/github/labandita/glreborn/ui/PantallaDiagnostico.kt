@@ -40,6 +40,8 @@ fun ContenidoDiagnostico(
     onPerfil: (PerfilDiagnostico) -> Unit,
     rutas: List<Pair<String, String>>,
     onGuardar: () -> Unit,
+    puedeCompartir: Boolean,
+    onCompartir: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Aviso(
@@ -64,6 +66,19 @@ fun ContenidoDiagnostico(
         Boton("Guardar informe ahora", Cristal.superficieMasAlta, Modifier.fillMaxWidth()) {
             onGuardar()
         }
+        // Compartir el último informe. Sin esto, en Android 8 y 9 el .md se guardaba dentro de
+        // la app y no había manera de sacarlo del teléfono: quedaba escrito y perdido.
+        Boton(
+            if (puedeCompartir) "Compartir el último informe" else "Aún no hay informe que compartir",
+            if (puedeCompartir) Cristal.marca else Cristal.superficieMasAlta,
+            Modifier.fillMaxWidth(),
+        ) { if (puedeCompartir) onCompartir() }
+        Text(
+            "El informe se genera solo al cerrar la app, y también con «Guardar informe ahora». " +
+                "Se guarda en Documentos/GLTools Reborn y además se puede mandar por correo o " +
+                "mensajería: sale de tu teléfono sólo si tú eliges a dónde.",
+            fontSize = 11.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
+        )
 
         Etiqueta("PERFIL DE MEDICIÓN")
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
