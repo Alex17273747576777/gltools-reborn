@@ -1,7 +1,7 @@
 import base64
 import json
 import unittest
-from preparar_firma import leer_firma, CAMPOS
+from preparar_firma import leer_firma, CAMPOS, diagnosticar_formato
 
 
 class FirmaJSON(unittest.TestCase):
@@ -12,6 +12,20 @@ class FirmaJSON(unittest.TestCase):
         key, datos = leer_firma({"GLTOOLS": json.dumps(self.datos())})
         self.assertEqual(key, b"fixture-not-a-real-key")
         self.assertEqual(datos[CAMPOS[2]], "alias-fixture")
+
+    def test_diagnostico_no_revela_valores(self):
+        d = self.datos(); d[CAMPOS[0]] = "fixture-invalida-no-publicar"
+        etiquetas = diagnosticar_formato({"GLTOOLS": json.dumps(d)})
+        self.assertIn("FORMATO_KEYSTORE_BASE64=INVALIDO", etiquetas)
+        for valor in d.values():
+            self.assertNotIn(valor, "\n".join(etiquetas))
+
+    def test_diagnostico_sintaxis(self):
+        self.assertEqual(diagnosticar_formato({"GLTOOLS": "not-json"}), ["FORMATO_JSON=INVALIDO"])
+
+    def test_diagnostico_campo_ausente(self):
+        d = self.datos(); del d[CAMPOS[3]]
+        self.assertIn("CAMPO_REBORN_KEY_PASS=AUSENTE", diagnosticar_formato({"GLTOOLS": json.dumps(d)}))
 
     def test_individuales(self):
         self.assertIsNotNone(leer_firma(self.datos()))

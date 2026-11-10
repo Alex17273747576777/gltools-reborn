@@ -38,6 +38,34 @@ def leer_firma(entorno):
     return contenido, {k: datos[k] for k in CAMPOS[1:]}
 
 
+
+def diagnosticar_formato(entorno):
+    """Sólo etiquetas prefijadas de un conjunto fijo: nunca imprime valores del Secret."""
+    raw = entorno.get("GLTOOLS", "")
+    if not raw:
+        return ["FORMATO_GLTOOLS=AUSENTE"]
+    try:
+        datos = json.loads(raw, object_pairs_hook=sin_duplicados)
+    except Exception:
+        return ["FORMATO_JSON=INVALIDO"]
+    if not isinstance(datos, dict):
+        return ["FORMATO_JSON=NO_ES_OBJETO"]
+    resultado = ["FORMATO_JSON=OBJETO_VALIDO"]
+    for clave in CAMPOS:
+        valor = datos.get(clave)
+        estado = "AUSENTE" if clave not in datos else "TIPO_INVALIDO" if not isinstance(valor, str) else "VACIO" if not valor else "CADENA_PRESENTE"
+        resultado.append("CAMPO_" + clave + "=" + estado)
+    valor = datos.get(CAMPOS[0])
+    if isinstance(valor, str) and valor:
+        try:
+            contenido = base64.b64decode("".join(valor.split()), validate=True)
+            estado = "VACIO" if not contenido else "DECODIFICABLE"
+        except Exception:
+            estado = "INVALIDO"
+        resultado.append("FORMATO_KEYSTORE_BASE64=" + estado)
+    return resultado
+
+
 def ocultar(valor):
     # Escape del protocolo de comandos de Actions, incluidos secretos multilínea.
     valor = valor.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
@@ -56,6 +84,8 @@ def main():
     try:
         firma = leer_firma(os.environ)
     except Exception:
+        for etiqueta in diagnosticar_formato(os.environ):
+            print(etiqueta, flush=True)
         print("::error::GLTOOLS debe ser un JSON válido con los cuatro campos REBORN indicados y keystore base64 válido. No se muestran valores.")
         return 1
     if firma is None:
