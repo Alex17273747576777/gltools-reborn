@@ -24,13 +24,27 @@ import java.io.File
  * y no se entrega nada. Un proveedor genérico de ficheros habría que confiar en que nadie
  * construya la URL de otra cosa; aquí no hay nada más que servir.
  */
+object ReglasInformes {
+
+    /** Prefijo y extensiones que se permiten. Corto y cerrado a propósito. */
+    val PERMITIDOS = Regex("^reborn-[a-z0-9_-]+\\.(md|txt)$")
+
+    /** La regla: es un informe si existe, es un fichero y se llama como uno. */
+    fun esInforme(archivo: File): Boolean =
+        archivo.isFile && PERMITIDOS.matches(archivo.name)
+
+    /** El texto que acompaña al envío: qué es, sin un solo dato del teléfono. */
+    fun asuntoDe(nombre: String): String =
+        "Informe de GLTools Reborn ($nombre). Generado en el teléfono; no se subió a " +
+            "ningún servidor."
+}
+
 class ProveedorInformes : ContentProvider() {
 
     companion object {
         private const val AUTORIDAD = "io.github.labandita.glreborn.informes"
 
-        /** Prefijos y extensiones que se permiten. Corto y cerrado a propósito. */
-        private val PERMITIDOS = Regex("^reborn-[a-z0-9_-]+\\.(md|txt)$")
+        private val PERMITIDOS = ReglasInformes.PERMITIDOS
 
         /** La URI de un informe interno, para poder compartirlo. */
         fun uri(context: Context, ruta: String): Uri? {
@@ -43,9 +57,8 @@ class ProveedorInformes : ContentProvider() {
                 .build()
         }
 
-        /** La regla, aparte para poder probarla sin Android delante. */
-        fun esInforme(archivo: File): Boolean =
-            archivo.isFile && PERMITIDOS.matches(archivo.name)
+        /** La regla vive en [ReglasInformes], que sí se puede probar sin Android delante. */
+        fun esInforme(archivo: File): Boolean = ReglasInformes.esInforme(archivo)
     }
 
     override fun onCreate(): Boolean = true
@@ -128,8 +141,5 @@ object Compartir {
         }
     }
 
-    /** El texto que acompaña al envío: qué es, sin datos del teléfono. */
-    fun asuntoDe(archivo: File): String =
-        "Informe de GLTools Reborn (${archivo.name}). Generado en el teléfono; no se " +
-            "subió a ningún servidor."
+    fun asuntoDe(archivo: File): String = ReglasInformes.asuntoDe(archivo.name)
 }

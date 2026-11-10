@@ -2157,7 +2157,8 @@ run {
     println()
     println("── compartir el informe ──")
     run {
-        val prov = io.github.labandita.glreborn.core.ProveedorInformes
+        // Se prueban las REGLAS, no el proveedor: `ContentProvider` no existe en esta JVM.
+        val prov = io.github.labandita.glreborn.core.ReglasInformes
         // El proveedor sólo sirve ficheros que son informes. Ésta es la regla de seguridad:
         // si se pudiera pedir cualquier cosa, sería un servidor de ficheros de la app.
         val finformes = java.io.File("/tmp")
@@ -2173,7 +2174,7 @@ run {
         check("sin ficheros no hay intent que compartir",
             prubIntentsNulo())
         // Y el texto que acompaña no lleva datos del teléfono: sólo el nombre del informe.
-        val asunto = io.github.labandita.glreborn.core.Compartir.asuntoDe(java.io.File("reborn-errores-x.txt"))
+        val asunto = io.github.labandita.glreborn.core.ReglasInformes.asuntoDe("reborn-errores-x.txt")
         check("el texto del envío no incluye datos del aparato",
             !asunto.contains("TECNO") && !asunto.contains("Android") && asunto.contains("reborn-errores-x.txt"))
 
