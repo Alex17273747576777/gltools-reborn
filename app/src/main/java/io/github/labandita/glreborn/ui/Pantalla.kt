@@ -52,6 +52,8 @@ fun PantallaPrincipal(
     resumenCompat: String,
     onProbarCompatibilidad: () -> Unit,
     fichas: List<Ficha>,
+    movimientos: List<Movimiento>,
+    onDeshacerRegistro: () -> Unit,
     onPanel: (String) -> Unit,
     datosSonda: Sonda.Datos?,
     edicionesTop: List<Datos.Edicion>,
@@ -989,6 +991,54 @@ fun PantallaPrincipal(
                     }
                 }
 
+                Pestana.HISTORIAL -> {
+                    item {
+                        Aviso(
+                            "Todo lo que la app cambió en este teléfono, junto y por fecha: las " +
+                                "propiedades de «Identidad» y lo que se le hizo a cada app. Se lee " +
+                                "de los dos cuadernos que ya existían; aquí no se guarda nada nuevo.",
+                            Cristal.marca,
+                        )
+                    }
+                    if (movimientos.isEmpty()) {
+                        item {
+                            Text(
+                                "Todavía no se cambió nada. Aplica un perfil, congela una app o " +
+                                    "toca un ajuste, y cada cambio aparecerá aquí con su hora y " +
+                                    "su vuelta atrás.",
+                                fontSize = 13.sp, lineHeight = 19.sp, color = Cristal.textoSuave,
+                            )
+                        }
+                    } else {
+                        // Agrupado por día: una cabecera por jornada y no por fila.
+                        var diaActual = ""
+                        movimientos.forEach { m ->
+                            val d = io.github.labandita.glreborn.core.ReglasMovimientos
+                                .dia(m.cuando, System.currentTimeMillis())
+                            if (d != diaActual) {
+                                diaActual = d
+                                item { Etiqueta(d.uppercase()) }
+                            }
+                            item { FilaMovimiento(m) }
+                        }
+                        item {
+                            Spacer(Modifier.height(8.dp))
+                            Boton("Deshacer lo escrito en propiedades", Cristal.ambar, Modifier.fillMaxWidth()) {
+                                onDeshacerRegistro()
+                            }
+                        }
+                        item {
+                            Text(
+                                "Ese botón devuelve las propiedades a su valor original. Lo que " +
+                                    "se hizo a las apps (congelar, detener, desinstalar) se deshace " +
+                                    "desde el panel de cada app, en Aplicado: no todo se deshace " +
+                                    "igual, y decirlo es parte de hacerlo bien.",
+                                fontSize = 11.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
+                            )
+                        }
+                    }
+                }
+
                 Pestana.APLICADO -> {
                     item {
                         Aviso(
@@ -1459,6 +1509,44 @@ private fun FilaAppAccion(
                 Cristal.marca, Modifier.weight(1f),
             ) { onPanel() }
         }
+    }
+}
+
+/**
+ * Una línea del historial: qué, dónde, cuándo y si se puede deshacer.
+ *
+ * Sin caja: dentro de un grupo las filas se separan con un hilo, no con bordes. Es el idioma de
+ * `Grupo.kt`, y una lista de historial de 40 cajas apiladas sería justo lo que no queremos.
+ */
+@Composable
+private fun FilaMovimiento(m: Movimiento) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Fila {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    if (m.fuente == Movimiento.FUENTE_REGISTRO) m.propiedad else m.despues,
+                    fontSize = 13.sp, lineHeight = 17.sp, color = Cristal.texto,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Text(m.detalle, fontSize = 12.sp, lineHeight = 17.sp, color = Cristal.textoSuave)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (m.fuente == Movimiento.FUENTE_REGISTRO) "propiedad" else m.donde,
+                        fontSize = 10.sp, color = Cristal.cian, fontWeight = FontWeight.Medium,
+                    )
+                    if (!m.reversible) Text(
+                        "sin vuelta atrás", fontSize = 10.sp, color = Cristal.rojo,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+            Text(
+                io.github.labandita.glreborn.core.ReglasMovimientos.hora(m.cuando),
+                fontSize = 11.sp, color = Cristal.textoSuave,
+                fontFamily = FontFamily.Monospace,
+            )
+        }
+        Hilo()
     }
 }
 

@@ -39,6 +39,7 @@ enum class Pestana(val destino: Destino, val titulo: String) {
 
     // Datos
     TOP500(Destino.DATOS, "TOP500"),
+    HISTORIAL(Destino.DATOS, "Historial"),
     APLICADO(Destino.DATOS, "Aplicado"),
     DISPOSITIVOS(Destino.DATOS, "Dispositivos"),
 
@@ -73,6 +74,7 @@ object Navegacion {
         "GPU" to Pestana.DIAGNOSTICO,
         "Diag." to Pestana.DIAGNOSTICO,
         "Compat." to Pestana.COMPATIBILIDAD,
+        "Historial" to Pestana.HISTORIAL,
         "Aplicado" to Pestana.APLICADO,
         "Aprender" to Pestana.GENERAR,
         "Rendi." to Pestana.RENDIMIENTO,

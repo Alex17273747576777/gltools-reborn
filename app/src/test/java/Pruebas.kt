@@ -45,6 +45,9 @@ class EjecutorFalso(private val props: MutableMap<String, String>, val bloquea: 
 fun propiedadesContables(s: Supercomputadora) =
     Supercomputadoras.propiedadesDe(s).toList()
 
+/** Ayuda: ¿existe esa subpestaña? Se pregunta al enum, no al texto del archivo. */
+fun PestañaExiste(nombre: String): Boolean = Pestana.entries.any { it.name == nombre }
+
 fun main() {
     println("PRUEBAS · GLTools Reborn\n")
 
@@ -760,9 +763,9 @@ run {
             Navegacion.pestanas(Destino.HERRAMIENTAS).contains(Pestana.RENDIMIENTO),
     )
     check(
-        "Datos conserva TOP500, aplicado y dispositivos",
+        "Datos conserva TOP500, aplicado y dispositivos, y gana el historial",
         Navegacion.pestanas(Destino.DATOS) ==
-            listOf(Pestana.TOP500, Pestana.APLICADO, Pestana.DISPOSITIVOS),
+            listOf(Pestana.TOP500, Pestana.HISTORIAL, Pestana.APLICADO, Pestana.DISPOSITIVOS),
     )
     check(
         "Ayuda conserva compatibilidad, diagnóstico, límites y fuentes",
@@ -1817,6 +1820,84 @@ run {
         if (home.exists()) {
             check("la portada trae la búsqueda", home.readText().contains("CajaBusqueda"))
         }
+    }
+
+
+    // ── 1.11.0: historial de cambios aplicados ───────────────────────────────
+    //
+    // Hasta la 1.10.0 había dos cuadernos separados —`Registro` para las propiedades, `Aplicado`
+    // para las apps— y ninguno contestaba «¿qué le he hecho a este teléfono?». Un DNS cambiado o
+    // una animación no aparecían en ninguna lista: se aplicaban y se olvidaban. Aquí se juntan,
+    // y estas leyes obligan a que la unión no invente ni pierda lo que había.
+    println()
+    println("── historial de cambios ──")
+    run {
+        val rm = io.github.labandita.glreborn.core.ReglasMovimientos
+        val ahora = 1_700_000_000_000L
+
+        val apuntes = listOf(
+            io.github.labandita.glreborn.core.Registro.Apunte(ahora - 3000, "persist.reborn.dns", "off", "on",
+                io.github.labandita.glreborn.core.Modo.SEGURO),
+            io.github.labandita.glreborn.core.Registro.Apunte(ahora - 1000, "ro.product.model", "TECNO BG7", "Pixel 8 Pro",
+                io.github.labandita.glreborn.core.Modo.EXPERTO),
+        )
+        val deApps = listOf(
+            io.github.labandita.glreborn.core.Movimiento(io.github.labandita.glreborn.core.Movimiento.FUENTE_APLICADO, ahora - 2000, "app:com.whatsapp", "WhatsApp", "Congelada", true),
+            io.github.labandita.glreborn.core.Movimiento(io.github.labandita.glreborn.core.Movimiento.FUENTE_APLICADO, ahora - 500, "app:com.juego", "Juego", "Desinstalada", false),
+        )
+        val juntos = rm.juntar(apuntes, deApps)
+
+        // Junta las dos fuentes: no se pierde ninguna.
+        check("el historial tiene las dos fuentes", juntos.size == 4, "${juntos.size}")
+        check("lo último va primero", juntos.first().cuando == ahora - 500)
+        check("y lo más viejo al final", juntos.last().cuando == ahora - 3000)
+
+        // Cada línea dice qué se tocó, sin inventar.
+        val dns = juntos.first { it.clave == "persist.reborn.dns" }
+        check("una propiedad se lee por su nombre", dns.propiedad == "persist.reborn.dns")
+        check("y dice de dónde a dónde", dns.detalle == "off → on")
+        check("una propiedad nueva no enseña un «antes» falso", dns.donde == "sistema")
+        val instalada = juntos.first { it.clave == "app:com.juego" }
+        check("lo de una app dice qué se hizo", instalada.que == "Desinstalada")
+        check("y de qué app", instalada.donde == "com.juego")
+
+        // Lo que no se puede deshacer se marca: no es lo mismo congelar que desinstalar.
+        check("la desinstalación se marca sin vuelta atrás", !instalada.reversible)
+        check("congelar sí se puede deshacer", juntos.first { it.que == "Congelada" }.reversible)
+        check("sólo lo del registro se deshace desde el historial",
+            rm.deshacibles(juntos).all { it.fuente == io.github.labandita.glreborn.core.Movimiento.FUENTE_REGISTRO } &&
+                rm.deshacibles(juntos).size == 2)
+
+        // El tope, que existe porque es un historial y no un archivo de auditoría.
+        val muchos = (1..500).map { i -> io.github.labandita.glreborn.core.Movimiento(io.github.labandita.glreborn.core.Movimiento.FUENTE_APLICADO, ahora + i, "app:p$i", "App $i", "Congelada", true) }
+        check("la lista no crece sin fin", rm.juntar(emptyList(), muchos).size == rm.MAX_VISIBLES)
+
+        // Los días y las horas, para agrupar sin una cabecera por fila.
+        check("hoy se dice «hoy»", rm.dia(ahora - 1000, ahora) == "hoy")
+        check("ayer se dice «ayer»", rm.dia(ahora - 30 * 60 * 60 * 1000, ahora) == "ayer")
+        check("más atrás se dice la fecha",
+            rm.dia(ahora - 9L * 24 * 60 * 60 * 1000, ahora).let { it != "hoy" && it != "ayer" && it.isNotBlank() })
+        check("la hora es corta", Regex("^\\d{2}:\\d{2}$").matches(rm.hora(ahora)), rm.hora(ahora))
+        check("sin nada, el resumen lo dice", rm.resumen(emptyList()) == "no se cambió nada todavía")
+        check("con un cambio, en singular", rm.resumen(listOf(dns)) == "1 cambio")
+        check("con varios, en plural", rm.resumen(juntos) == "4 cambios")
+
+        // Y la pantalla: el historial tiene que estar de verdad, con su botón de deshacer y su
+        // distinción entre lo que se deshace aquí y lo que se deshace en el panel de cada app.
+        val ui = java.io.File(uiDir, "Pantalla.kt")
+        if (ui.exists()) {
+            val u = ui.readText()
+            check("la pestaña Historial existe", PestañaExiste("HISTORIAL"))
+            check("la pantalla pinta una línea por cambio", u.contains("FilaMovimiento"))
+            check("agrupa por día", u.contains("ReglasMovimientos"))
+            check("y avisa de lo que no se deshace desde aquí", u.contains("sin vuelta atrás"))
+        }
+        // El historial no guarda nada nuevo: lee de los dos cuadernos que ya existían.
+        val mov = java.io.File("src/main/java/io/github/labandita/glreborn/core/Movimientos.kt").let {
+            if (it.exists()) it else java.io.File("app/src/main/java/io/github/labandita/glreborn/core/Movimientos.kt")
+        }
+        check("el historial lee, no duplica el estado", mov.exists() &&
+            mov.readText().contains("registro.historial()") && mov.readText().contains("aplicado.fichas("))
     }
 
     println()

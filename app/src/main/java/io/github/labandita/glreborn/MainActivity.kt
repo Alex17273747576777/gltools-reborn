@@ -506,6 +506,15 @@ private fun App(
             resumenCompat = director.compatibilidad().resumen(pruebasCompat)
         },
         fichas = fichas,
+        movimientos = proteger("historial") {
+            director.movimientos().todos(apps.associate { it.paquete to it.nombre })
+        } ?: emptyList(),
+        onDeshacerRegistro = {
+            // El mismo camino que «Restaurar»: una sola forma de deshacer, no dos que se porten
+            // distinto. Y se relee todo después, para que el historial enseñe el cambio.
+            resultado = director.restaurar()
+            actual = director.telefoniaActual()
+        },
         onPanel = { paquete ->
             appPanel = apps.firstOrNull { it.paquete == paquete }
             panelDe = paquete
@@ -656,7 +665,7 @@ private fun App(
             irreversibleAplicado = false,
             sinApps = apps.isEmpty(),
         ),
-        version = "1.10.0",
+        version = "1.11.0",
     )
 }
 

@@ -40,6 +40,8 @@ class Director(context: Context) {
     fun pantalla(): AjustesPantalla = AjustesPantalla(shell)
     fun compatibilidad(): Compatibilidad = Compatibilidad(shell)
     fun aplicado(): Aplicado = aplicado
+    /** La línea de tiempo de todo lo cambiado: lee de `Registro` y de `Aplicado`, no guarda nada. */
+    fun movimientos(): Movimientos = Movimientos(app, registro, aplicado)
     private var estado: Estado = Estado.SIN_VIA
     private var original: Map<String, String> = emptyMap()
 

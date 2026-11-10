@@ -67,8 +67,11 @@ object BusquedaGlobal {
             listOf("compatibilidad", "probado", "pruebas", "shizuku"), Destino("AYUDA", "COMPATIBILIDAD")),
         Seccion("Datos y fuentes", "de dónde sale cada dato",
             listOf("datos", "fuentes", "top500", "dispositivos", "catalogo"), Destino("DATOS", "TOP500")),
-        Seccion("Cambios aplicados", "qué se cambió y cómo se deshace",
-            listOf("aplicado", "registro", "deshacer", "restaurar", "historial"), Destino("DATOS", "APLICADO")),
+        Seccion("Historial de cambios", "todo lo cambiado, junto y por fecha",
+            listOf("historial", "registro", "deshacer", "restaurar", "cambios", "timeline"),
+            Destino("DATOS", "HISTORIAL")),
+        Seccion("Cambios aplicados", "qué se le hizo a cada app y cuándo",
+            listOf("aplicado", "app", "congelar", "panel"), Destino("DATOS", "APLICADO")),
     )
 
     /**
