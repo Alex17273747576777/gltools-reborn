@@ -3,6 +3,28 @@
 Máquina de compilación: JDK 21.0.13 · Gradle 8.11.1 · Android SDK platform 35 ·
 build-tools 35.0.0.
 
+## 1.9.0 · la Home copiada de quien lo hace bien
+
+Encargo: mirar apps de **Tools** y **Root & System** de `appteka.store`, aprender de su código y
+de su diseño, y aplicarlo. Se descargaron 8 APK, se desmontaron con `aapt2` y `jadx` y se
+miraron sus capturas. El detalle app por app está en [APRENDIDO-DE-APPS.md](APRENDIDO-DE-APPS.md).
+
+| Qué | Cómo | Resultado |
+|---|---|---|
+| Ningún `LazyColumn`/`LazyRow` dentro de la Home | `pruebasNucleo`, sobre el fuente | **0**; un solo gesto de desplazamiento |
+| La Home se desplaza con `verticalScroll` | idem | sí, con `rememberScrollState()` |
+| Hay carrusel de píldoras con una encendida | idem | `horizontalScroll` + forma de píldora al 50 % |
+| Las acciones son baldosas con icono dibujado | idem | 4 baldosas, todas con `icono = {` |
+| El carrusel no promete más de lo que hay | idem | los 5 medidores tienen datos detrás |
+| No se dibujan cajas por todas partes | idem | ≤1 `.border(` en toda la Home |
+| Suite completa | `gradle :app:pruebasNucleo` | **338 comprobaciones, 0 fallos** |
+| APK firmado y con las cadenas nuevas dentro | `apksigner` + `strings` sobre el dex | firma OK, `versionCode 12`, `IDENTIDAD EN USO` presente |
+
+**Lo que NO está probado en 1.9.0, y se dice:** los patrones están aplicados, compilados y
+vigilados por pruebas, pero **cómo se sienten al dedo no se ha probado**: no hay emulador con
+KVM ni teléfono conectado en la máquina de compilación. Las capturas de Appteka que se usaron
+para aprender son de los autores de cada app, no mías.
+
 ## 1.8.1 · la app que se cerraba y el fin del disfraz de HTML
 
 Dos encargos en este tramo: **que no se cierre** y **cambiar el sistema de diseño**, no retocarlo.
