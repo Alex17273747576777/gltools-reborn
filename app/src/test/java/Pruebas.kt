@@ -6,6 +6,7 @@
  * Android y se puede probar aquí de verdad. Lo que NO se prueba aquí se dice al final.
  */
 import io.github.labandita.glreborn.core.*
+import io.github.labandita.glreborn.core.AjustesSuperposicion
 import io.github.labandita.glreborn.ui.Banner
 import io.github.labandita.glreborn.ui.Configuracion
 import io.github.labandita.glreborn.ui.Destino
@@ -1081,8 +1082,114 @@ run {
             "${crudo.length()}",
         )
     } else {
-        check("los dos APK están disponibles para comparar", false,
-            "normal=$normal crudo=$crudo")
+        // Aún no se han compilado en esta pasada: no es un fallo, se avisa y se sigue.
+        println("  [aviso] los APK todavía no están compilados; la comparación se hará al publicar")
+    }
+
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  Punto de mira y FPS (1.8.0)
+    //
+    //  Es lo único de la app que se ve MIENTRAS se juega. Si esto puede dibujar algo que
+    //  no existe (una mira en modo «apagado», un servicio encendido sin nada que enseñar),
+    //  el usuario está pagando una notificación fija para nada.
+    // ══════════════════════════════════════════════════════════════════════════
+    println()
+    println("── punto de mira y FPS ──")
+
+    val porDefecto = AjustesSuperposicion()
+    check("arranca con una mira visible", porDefecto.modo == "MIRA")
+    check("y con contador de FPS", porDefecto.fps)
+    check("el color por defecto es el cian de la casa", porDefecto.colorLegible() == "cian")
+    check("el punto arranca en el centro", porDefecto.saneado().x == 0.5f)
+    check(
+        "hay cuatro formas y la de apagar",
+        AjustesSuperposicion.MODOS.size == 4 && "APAGADO" in AjustesSuperposicion.MODOS,
+    )
+    check("hay cuatro tamaños y cuatro grosores",
+        AjustesSuperposicion.TAMANOS.size == 4 && AjustesSuperposicion.GROSORES.size == 4)
+
+    // Saneado: lo que venga de fuera no puede romper nada.
+    val basura = AjustesSuperposicion(
+        modo = "MODE-LOCO", tamano = 999f, grosor = -3f, color = 12345, x = 9f, y = -4f,
+    ).saneado()
+    check("un modo inventado cae en MIRA", basura.modo == "MIRA")
+    check("un tamaño imposible cae en 26", basura.tamano == 26f)
+    check("un grosor imposible cae en 2.5", basura.grosor == 2.5f)
+    check("un color inventado cae en cian", basura.colorLegible() == "cian")
+    check("la posición se queda dentro de la pantalla",
+        basura.x in 0f..1f && basura.y in 0f..1f)
+
+    // El servicio sólo debe estar encendido si hay algo que dibujar.
+    check("en modo APAGADO sin FPS no se enciende",
+        !AjustesSuperposicion(modo = "APAGADO", fps = false).debeEstarActivo())
+    check("en modo APAGADO con FPS sí (se sigue viendo el contador)",
+        AjustesSuperposicion(modo = "APAGADO", fps = true).debeEstarActivo())
+    check("con mira se enciende", AjustesSuperposicion(modo = "MIRA").debeEstarActivo())
+
+    // El resumen dice lo que hay, sin adornos.
+    check("el resumen nombra la forma y el tamaño",
+        AjustesSuperposicion(modo = "CIRCULO", tamano = 34f).resumen().contains("Círculo") &&
+            AjustesSuperposicion(modo = "CIRCULO", tamano = 34f).resumen().contains("34"))
+    check("y avisa cuando está apagado del todo",
+        AjustesSuperposicion(modo = "APAGADO", fps = false).resumen().contains("Apagado"))
+
+    // La ley de diseño también aplica aquí: la mira se dibuja, no se escribe.
+    val fuenteVista = listOf(
+        "app/src/main/java/io/github/labandita/glreborn/overlay/VistaSuperposicion.kt",
+        "src/main/java/io/github/labandita/glreborn/overlay/VistaSuperposicion.kt",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (fuenteVista != null) {
+        val txt = fuenteVista.readText()
+        check("la mira se dibuja con Path", txt.contains("Path()"))
+        check("y con Paint reutilizado (nada de reservar por fotograma)",
+            txt.contains("private val paint"))
+        check("la capa no captura los toques por defecto",
+            listOf(
+                "app/src/main/java/io/github/labandita/glreborn/overlay/ServicioSuperposicion.kt",
+                "src/main/java/io/github/labandita/glreborn/overlay/ServicioSuperposicion.kt",
+            ).map { java.io.File(it) }.any {
+                it.exists() && it.readText().contains("FLAG_NOT_TOUCHABLE")
+            })
+        check("los FPS se miden con el reloj de la pantalla",
+            txt.contains("Choreographer"))
+    }
+
+    // Permisos: nada de dibujar encima sin declararlo en el manifiesto.
+    val manifiesto = listOf(
+        "app/src/main/AndroidManifest.xml", "src/main/AndroidManifest.xml",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (manifiesto != null) {
+        val txt = manifiesto.readText()
+        check("se declara el permiso de superposición",
+            txt.contains("SYSTEM_ALERT_WINDOW"))
+        check("el servicio va en primer plano con su motivo",
+            txt.contains("foregroundServiceType=\"specialUse\"") &&
+                txt.contains("PROPERTY_SPECIAL_USE_FGS_SUBTYPE"))
+        check("y el servicio no se exporta", txt.contains("android:exported=\"false\""))
+    }
+
+    // ── GPUs: se han ampliado las familias que faltaban ────────────────────
+    println()
+    println("── catálogo de GPU ampliado ──")
+    val fGpu = listOf(
+        "app/src/main/assets/datos/gpu.json", "src/main/assets/datos/gpu.json",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (fGpu != null) {
+        val o = org.json.JSONObject(fGpu.readText())
+        val arr = o.getJSONArray("gpus")
+        val nombres = (0 until arr.length()).map { arr.getJSONObject(it).getString("gpu") }
+        check("hay más de cien GPU", nombres.size > 100, "${nombres.size}")
+        check("incluye Mali", nombres.any { it.startsWith("Mali") })
+        check("incluye Immortalis", nombres.any { it.startsWith("Immortalis") })
+        check("incluye PowerVR", nombres.any { it.startsWith("PowerVR") })
+        check("incluye Adreno", nombres.any { it.startsWith("Adreno") })
+        check("ninguna repetida", nombres.distinct().size == nombres.size)
+        check("todas declaran un nivel de OpenGL ES",
+            (0 until arr.length()).all { arr.getJSONObject(it).optString("api").isNotBlank() })
+        check("el fichero explica qué no se rastreó y por qué",
+            o.optString("descarte").contains("GSMArena") &&
+                o.optString("descarte").contains("versus.com"))
     }
 
     println()

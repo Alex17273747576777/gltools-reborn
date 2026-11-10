@@ -24,6 +24,8 @@ import io.github.labandita.glreborn.ui.Cristal
 import io.github.labandita.glreborn.ui.PanelApp
 import androidx.compose.ui.text.font.FontWeight
 import io.github.labandita.glreborn.core.*
+import io.github.labandita.glreborn.core.AjustesSuperposicion
+import io.github.labandita.glreborn.overlay.ServicioSuperposicion
 import io.github.labandita.glreborn.ui.Banner
 import io.github.labandita.glreborn.ui.Estado
 import io.github.labandita.glreborn.ui.PantallaPrincipal
@@ -136,6 +138,26 @@ private fun App(
     var datosEquipo by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var pruebasCompat by remember { mutableStateOf<List<Compatibilidad.Prueba>>(emptyList()) }
     var resumenCompat by remember { mutableStateOf("") }
+
+    // ── Punto de mira y FPS. Vive en el Activity porque sobrevive a los cambios de pantalla.
+    val contextoSuperposicion = LocalContext.current.applicationContext
+    var ajustesSuperposicion by remember { mutableStateOf(AjustesSuperposicion.leer(contextoSuperposicion)) }
+    var superposicionActiva by remember { mutableStateOf(false) }
+    var tienePermisoSuperposicion by remember {
+        mutableStateOf(ServicioSuperposicion.puedeDibujar(contextoSuperposicion))
+    }
+    // Al volver de Ajustes hay que releer el permiso: el usuario pudo concederlo o quitarlo.
+    val ciclo = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(ciclo) {
+        val observador = androidx.lifecycle.LifecycleEventObserver { _, evento ->
+            if (evento == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                tienePermisoSuperposicion =
+                    ServicioSuperposicion.puedeDibujar(contextoSuperposicion)
+            }
+        }
+        ciclo.lifecycle.addObserver(observador)
+        onDispose { ciclo.lifecycle.removeObserver(observador) }
+    }
     var fichas by remember { mutableStateOf<List<Ficha>>(emptyList()) }
     var datosSonda by remember { mutableStateOf<Sonda.Datos?>(null) }
     var edicionesTop by remember { mutableStateOf<List<Datos.Edicion>>(emptyList()) }
@@ -425,6 +447,64 @@ private fun App(
             releer()
             alcance.launch { releerShell() }
         },
+        ajustesSuperposicion = ajustesSuperposicion,
+        superposicionActiva = superposicionActiva,
+        tienePermisoSuperposicion = tienePermisoSuperposicion,
+        onCambiarSuperposicion = { nuevos ->
+            val saneados = nuevos.saneado()
+            ajustesSuperposicion = saneados
+            AjustesSuperposicion.guardar(contextoSuperposicion, saneados)
+            if (superposicionActiva) {
+                // Se aplica en caliente: no hay que apagar y encender para ver el cambio.
+                ServicioSuperposicion.aplicarEnCaliente(contextoSuperposicion, saneados)
+            }
+            if (!saneados.debeEstarActivo() && superposicionActiva) {
+                ServicioSuperposicion.detener(contextoSuperposicion)
+                superposicionActiva = false
+            }
+        },
+        onPermisoSuperposicion = {
+            // Android exige que el usuario lo conceda a mano: se abre la pantalla exacta.
+            val i = android.content.Intent(
+                android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                android.net.Uri.parse("package:" + contextoSuperposicion.packageName),
+            )
+            try {
+                contextoSuperposicion.startActivity(
+                    i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (e: Exception) {
+                // Si el fabricante esconde esa pantalla, se dice en vez de fingir.
+                resultado = Resultado(
+                    ok = false,
+                    via = Via.NINGUNA,
+                    detalle = "Este teléfono no abre la pantalla de superposiciones.",
+                    lineas = listOf(
+                        "Búscala a mano: Ajustes → Apps → Acceso especial → Dibujar sobre otras apps.",
+                    ),
+                )
+            }
+        },
+        onActivarSuperposicion = {
+            if (ServicioSuperposicion.puedeDibujar(contextoSuperposicion)) {
+                ServicioSuperposicion.iniciar(contextoSuperposicion, ajustesSuperposicion)
+                superposicionActiva = true
+            } else {
+                tienePermisoSuperposicion = false
+            }
+        },
+        onDesactivarSuperposicion = {
+            ServicioSuperposicion.detener(contextoSuperposicion)
+            superposicionActiva = false
+        },
+        onMoverSuperposicion = {
+            ServicioSuperposicion.activarArrastre(contextoSuperposicion)
+            android.widget.Toast.makeText(
+                contextoSuperposicion,
+                "Arrastra el punto 3 segundos",
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        },
         banner = Estado.banner(
             conRoot = estado == Director.Estado.ROOT_LISTO,
             conShizuku = estado == Director.Estado.SHIZUKU_LISTO ||
@@ -449,7 +529,7 @@ private fun App(
             irreversibleAplicado = false,
             sinApps = apps.isEmpty(),
         ),
-        version = "1.7.0",
+        version = "1.8.0",
     )
 }
 

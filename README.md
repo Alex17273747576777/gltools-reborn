@@ -17,6 +17,40 @@ Cambiar el modelo es útil para que un juego aplique un preset gráfico en vez d
 terceros, no trae binarios ajenos. Ver [PROCEDENCIA.md](PROCEDENCIA.md) para el detalle
 de qué se tomó como referencia del proyecto original y qué se descartó, con nombre y motivo.
 
+## Punto de mira y FPS (1.8.0)
+
+Es lo único de la app que se ve **mientras se juega**, y hasta la 1.7.1 no existía: teníamos
+toda la configuración y nada en pantalla.
+
+| Qué | Cómo |
+|---|---|
+| Formas | Mira, círculo, cruz y apagado |
+| Tamaños | 18 · 26 · 34 · 44 px |
+| Grosores | 1,5 · 2,5 · 3,5 · 5 px |
+| Colores | cian, verde, rosa, blanco, rojo |
+| FPS | reales, medidos con `Choreographer` (el reloj de la pantalla), no estimados |
+| Mover | se activa el arrastre 3 segundos y se coloca con el dedo |
+| Toques | **touch-through**: el juego sigue recibiendo los dedos |
+
+**No necesita root ni Shizuku.** Usa la API pública de superposiciones de Android
+(`SYSTEM_ALERT_WINDOW`), que el usuario concede a mano y puede quitar cuando quiera. Mientras
+está activo hay una notificación fija con el botón «Quitar»: Android no permite dibujar encima
+de la pantalla en silencio, y hace bien.
+
+Detalles que importan y no se ven: los `Paint` y el `Path` se crean **una vez** y se reutilizan
+—reservar memoria 60 veces por segundo calentaría el teléfono y bajaría los FPS, justo lo
+contrario de lo que promete—; la vista no es cliqueable; y el servicio se apaga solo si el
+usuario cierra la app.
+
+## Catálogo de GPU ampliado (1.8.0)
+
+De 78 a **112 GPU**: se añadieron las familias **Mali** (T, G, Immortalis) y **PowerVR**, que
+son las que llevan los teléfonos de gama media —incluido el TECNO BG7 del autor, con
+PowerVR GE8320—. Antes el catálogo era casi todo Adreno, que es lo que llevan los caros.
+
+`gpu.json` declara ahora `descarte` con lo que **no** se rastreó y por qué: GSMArena responde
+con un reto de Cloudflare (Turnstile) y versus.com con un 202 vacío. No se inventa nada.
+
 ## Normas de diseño
 
 La norma completa vive en el espacio de trabajo, fuera de este repo:

@@ -31,6 +31,7 @@ enum class Pestana(val destino: Destino, val titulo: String) {
 
     // Herramientas
     CONFIGURAR(Destino.HERRAMIENTAS, "Configurar"),
+    SUPERPOSICION(Destino.HERRAMIENTAS, "Mira"),
     RENDIMIENTO(Destino.HERRAMIENTAS, "Rendimiento"),
     APPS(Destino.HERRAMIENTAS, "Apps"),
     PANTALLA(Destino.HERRAMIENTAS, "Pantalla"),
@@ -76,6 +77,7 @@ object Navegacion {
         "Aprender" to Pestana.GENERAR,
         "Rendi." to Pestana.RENDIMIENTO,
         "Configurar" to Pestana.CONFIGURAR,
+        "Punto de mira" to Pestana.SUPERPOSICION,
     )
 
     fun destinoDe(pestana: Pestana): Destino = pestana.destino

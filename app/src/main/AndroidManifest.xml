@@ -16,6 +16,18 @@
 
     <!-- Notificaciones: sólo para avisar de la reversión automática de resolución. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+      Dibujar el punto de mira encima del juego. Es un permiso NORMAL de Android: lo concede
+      el usuario a mano en Ajustes y puede quitarlo cuando quiera. No es root ni Shizuku, y se
+      puede negar sin que el resto de la app deje de funcionar.
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!--
+      El servicio que dibuja va en primer plano y con notificación: Android no permite pintar
+      encima de la pantalla en silencio, y hace bien.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!--
       ANTES AQUÍ: CERO PERMISOS DE INTERNET A PROPÓSITO.
@@ -71,5 +83,19 @@
             android:exported="true"
             android:multiprocess="false"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
-    </application>
+    
+        <!--
+          El servicio de superposición. `specialUse` porque no encaja en ninguna categoría de
+          primer plano de Android 14: dibuja una capa de mira y un contador de FPS. Se declara
+          la propiedad con el motivo, que es lo que exige la plataforma.
+        -->
+        <service
+            android:name=".overlay.ServicioSuperposicion"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Punto de mira y contador de FPS dibujados sobre el juego a peticion del usuario" />
+        </service>
+</application>
 </manifest>

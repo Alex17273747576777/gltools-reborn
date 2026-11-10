@@ -378,7 +378,7 @@ private fun TarjetaIdentidad(
 }
 
 @Composable
-private fun BotonHome(
+internal fun BotonHome(
     texto: String,
     color: Color,
     modifier: Modifier = Modifier,

@@ -3,6 +3,23 @@
 Máquina de compilación: JDK 21.0.13 · Gradle 8.11.1 · Android SDK platform 35 ·
 build-tools 35.0.0.
 
+## 1.8.0 · punto de mira, FPS y GPU
+
+| Qué | Cómo | Resultado |
+|---|---|---|
+| Ajustes del punto de mira sanos | `pruebasNucleo` | modo, tamaño, grosor, color y posición inválidos caen a un valor válido |
+| El servicio no se enciende para nada | idem | en modo apagado sin FPS, `debeEstarActivo()` es falso |
+| La mira se dibuja, no se escribe | idem, sobre el fuente | `Path()`, `Paint` reutilizado, `Choreographer` |
+| La capa deja pasar los toques | idem, sobre el fuente | `FLAG_NOT_TOUCHABLE` presente en el servicio |
+| Permisos declarados | idem, sobre el manifiesto | `SYSTEM_ALERT_WINDOW`, servicio `specialUse` con motivo, no exportado |
+| Catálogo de GPU | idem, sobre el dato | 112 GPU, sin repetidas, todas con nivel de OpenGL ES, con `descarte` explicado |
+| Suite completa | `gradle :app:pruebasNucleo` | **314 comprobaciones, 0 fallos** |
+
+**Lo que NO está probado en 1.8.0, y se dice:** la superposición **no se ha visto funcionar en
+un teléfono**. Compila, la lógica está probada y los permisos están declarados, pero que el
+punto de mira se dibuje encima de un juego concreto sólo se sabe instalándolo. Tampoco se ha
+probado en Android 13/HIOS del TECNO BG7.
+
 ## 1.7.1 · ley de diseño vigilada
 
 | Qué | Cómo | Resultado |

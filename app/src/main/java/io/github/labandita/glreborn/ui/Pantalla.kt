@@ -80,6 +80,14 @@ fun PantallaPrincipal(
     puedeHacer: String,
     avisosHome: List<Estado.Par>,
     version: String,
+    ajustesSuperposicion: AjustesSuperposicion,
+    superposicionActiva: Boolean,
+    tienePermisoSuperposicion: Boolean,
+    onCambiarSuperposicion: (AjustesSuperposicion) -> Unit,
+    onPermisoSuperposicion: () -> Unit,
+    onActivarSuperposicion: () -> Unit,
+    onDesactivarSuperposicion: () -> Unit,
+    onMoverSuperposicion: () -> Unit,
 ) {
     var destino by remember { mutableStateOf(Destino.HOME) }
     var pestana by remember { mutableStateOf<Pestana?>(null) }
@@ -828,6 +836,20 @@ fun PantallaPrincipal(
                     }
                 }
 
+                Pestana.SUPERPOSICION -> {
+                    item {
+                        PantallaSuperposicion(
+                            a = ajustesSuperposicion,
+                            tienePermiso = tienePermisoSuperposicion,
+                            activo = superposicionActiva,
+                            onCambiar = onCambiarSuperposicion,
+                            onPedirPermiso = onPermisoSuperposicion,
+                            onActivar = onActivarSuperposicion,
+                            onDesactivar = onDesactivarSuperposicion,
+                            onMover = onMoverSuperposicion,
+                        )
+                    }
+                }
                 Pestana.CONFIGURAR -> {
                     item {
                         Text(
