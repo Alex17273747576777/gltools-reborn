@@ -1466,6 +1466,40 @@ run {
         }
     }
 
+
+    // ── 1.9.4: inestabilidad ─────────────────────────────────────────────────
+    //
+    // Dos formas de que la app se sienta rota sin cerrarse: perder lo que estabas mirando
+    // cuando Android mata el proceso en segundo plano, y volver a mirar el teléfono entero cada
+    // vez que vuelves a la app. Las dos estaban.
+    println()
+    println("── estabilidad ──")
+    if (uiDir != null) {
+        val pantalla = java.io.File(uiDir, "Pantalla.kt")
+        if (pantalla.exists()) {
+            val s = pantalla.readText()
+            check("el destino sobrevive a que Android mate el proceso",
+                s.contains("var destino by rememberSaveable"))
+            check("la pestaña también", s.contains("var pestana by rememberSaveable"))
+            check("lo que estabas escribiendo también", s.contains("var consulta by rememberSaveable"))
+        }
+        val home = java.io.File(uiDir, "Home.kt")
+        if (home.exists()) {
+            check("el medidor elegido sobrevive", home.readText().contains("var medidor by rememberSaveable"))
+        }
+    }
+    val act = listOf(
+        "app/src/main/java/io/github/labandita/glreborn/MainActivity.kt",
+        "src/main/java/io/github/labandita/glreborn/MainActivity.kt",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (act != null) {
+        val a = act.readText()
+        check("volver a la app no repite la lectura del teléfono",
+            a.contains("fun releerSiToca()") && a.contains("8_000L"))
+        check("volver a la app sí refresca cuando toca",
+            a.contains("releerSiToca()"))
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

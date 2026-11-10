@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -91,13 +92,13 @@ fun PantallaPrincipal(
     falloLectura: String? = null,
     onDescartarFalloLectura: () -> Unit = {},
 ) {
-    var destino by remember { mutableStateOf(Destino.HOME) }
-    var pestana by remember { mutableStateOf<Pestana?>(null) }
+    var destino by rememberSaveable { mutableStateOf(Destino.HOME) }
+    var pestana by rememberSaveable { mutableStateOf<Pestana?>(null) }
 
     // Estado de la sección Aprender. Vive aquí, no dentro del LazyColumn: la lambda de
     // contenido de un LazyColumn no es @Composable y `remember` no compila ahí dentro.
-    var consulta by remember { mutableStateOf("") }
-    var textoPegado by remember { mutableStateOf("") }
+    var consulta by rememberSaveable { mutableStateOf("") }
+    var textoPegado by rememberSaveable { mutableStateOf("") }
     var extraido by remember { mutableStateOf<Extractor.Extraido?>(null) }
     var candidatos by remember { mutableStateOf<List<Distribuida.Candidato>>(emptyList()) }
     var consultaCatalogo by remember { mutableStateOf("") }

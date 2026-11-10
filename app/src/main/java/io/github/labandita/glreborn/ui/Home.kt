@@ -10,6 +10,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.*
@@ -73,7 +74,7 @@ fun PantallaHome(
     falloLectura: String? = null,
     onDescartarFalloLectura: () -> Unit = {},
 ) {    // Qué medidor está encendido. Vive aquí para que el carrusel y el panel sean uno.
-    var medidor by remember { mutableStateOf(0) }
+    var medidor by rememberSaveable { mutableStateOf(0) }
 
     // El carrusel de píldoras vive DENTRO de este contenedor, así que aquí no puede haber un
     // LazyColumn: dos «lista y desplaza» anidados se pelean por el gesto y ya cerraron la app

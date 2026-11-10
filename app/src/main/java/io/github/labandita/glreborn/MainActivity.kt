@@ -187,6 +187,28 @@ private fun App(
     var tienePermisoSuperposicion by remember {
         mutableStateOf(ServicioSuperposicion.puedeDibujar(contextoSuperposicion))
     }
+    // Cuándo se miró el teléfono por última vez. Ver `releerSiToca()`.
+    val ultimaLectura = androidx.compose.runtime.remember { longArrayOf(0L) }
+
+    /**
+     * Releer el teléfono sólo si ha pasado tiempo suficiente.
+     *
+     * El problema: cada vuelta a la app (cambiar de juego y volver, mirar una notificación,
+     * girar el teléfono) repetía el inventario de apps, el diagnóstico, la sonda y el estado de
+     * la pantalla. En un TECNO con 4 GB eso es medio segundo de trabajo y memoria, cada vez.
+     *
+     * Ahora hay una ventana de 8 segundos: dentro de ella no se vuelve a leer; fuera, sí. Y la
+     * lectura se hace **una sola vez**, no una por cada cosa que la pida.
+     */
+    fun releerSiToca() {
+        val ahora = System.currentTimeMillis()
+        if (ahora - ultimaLectura[0] < 8_000L) return
+        ultimaLectura[0] = ahora
+        // Antes de la declaración de `protegerLectura`, así que directo y a prueba de todo.
+        runCatching { onRefrescar() }
+            .onFailure { onFalloLectura("vuelta a la app · ${it.message}") }
+    }
+
     // Al volver de Ajustes hay que releer el permiso: el usuario pudo concederlo o quitarlo.
     val ciclo = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(ciclo) {
@@ -194,6 +216,9 @@ private fun App(
             if (evento == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 tienePermisoSuperposicion =
                     ServicioSuperposicion.puedeDibujar(contextoSuperposicion)
+                // Y el teléfono: volver de una app no puede dejar los datos viejos, pero
+                // tampoco hay que releerlo todo si se ha vuelto en dos segundos.
+                releerSiToca()
             }
         }
         ciclo.lifecycle.addObserver(observador)
@@ -299,7 +324,12 @@ private fun App(
     }
 
     // Un LaunchedEffect que lanza una excepción tumba la app entera: aquí NADA sale sin red.
-    LaunchedEffect(Unit) { runCatching { releer() } }
+    LaunchedEffect(Unit) {
+        runCatching {
+            ultimaLectura[0] = System.currentTimeMillis()
+            releer()
+        }
+    }
 
     // Los datos del APK se leen una vez, en segundo plano: son varios MB y no pueden
     // bloquear el primer pintado. Mientras tanto la pantalla ya está en pie.
@@ -626,7 +656,7 @@ private fun App(
             irreversibleAplicado = false,
             sinApps = apps.isEmpty(),
         ),
-        version = "1.9.3",
+        version = "1.9.4",
     )
 }
 
