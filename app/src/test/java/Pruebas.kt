@@ -1334,9 +1334,10 @@ run {
             Regex("Baldosa\\(").findAll(h).count() >= 4 && h.contains("interno") == false)
         check("las baldosas llevan icono, no texto suelto", h.contains("icono = {"))
         // Cada píldora tiene datos detrás: cinco medidores, no cinco huecos.
+        // Ahora los nombres pueden llegar por parámetro (el catálogo usa el mismo carrusel
+        // para filtrar), así que se comprueba el valor por defecto de la portada.
         check("el carrusel no promete más de lo que hay",
-            Regex("val nombres = listOf\\(").containsMatchIn(h) &&
-                h.split("val nombres = listOf").getOrNull(1)?.contains("Sonda") == true)
+            h.contains("Identidad") && h.contains("Sonda") && h.contains("Arquitectura"))
         // Nada de cajas del mismo peso: la Home usa líneas y huecos, no bordes por todas partes.
         val cajas = Regex("\\.border\\(").findAll(h).count()
         check("Home no dibuja cajas por todas partes", cajas <= 1, "$cajas bordes")
@@ -1566,6 +1567,38 @@ run {
         check("el nombre del fichero lleva fecha",
             io.github.labandita.glreborn.core.Respaldo.nombreDeFichero(1_700_000_000_000L)
                 .matches(Regex("glreborn-perfiles-\\d{8}-\\d{4}\\.json")))
+    }
+
+
+    // ── 1.9.6: filtrar el catálogo por confianza ─────────────────────────────
+    //
+    // El catálogo mezcla perfiles verificados con fichas sin comprobar, y no es lo mismo aplicar
+    // uno que otro. La app ya lo decía tarjeta por tarjeta; ahora además se puede filtrar. Y las
+    // cuentas del filtro tienen que cuadrar con la lista: un filtro que miente sobre cuántos hay
+    // es peor que no tener filtro.
+    println()
+    println("── catálogo filtrable ──")
+    run {
+        val todos = io.github.labandita.glreborn.core.Perfiles.todos
+        val ver = todos.count { it.confianza == io.github.labandita.glreborn.core.PerfilDispositivo.Confianza.VERIFICADO }
+        val par = todos.count { it.confianza == io.github.labandita.glreborn.core.PerfilDispositivo.Confianza.PARCIAL }
+        val sin = todos.count { it.confianza == io.github.labandita.glreborn.core.PerfilDispositivo.Confianza.SIN_VERIFICAR }
+        check("las tres confianzas suman el catálogo entero", ver + par + sin == todos.size,
+            "$ver+$par+$sin != ${todos.size}")
+        check("hay perfiles verificados de verdad", ver > 0, "$ver")
+        check("ningún perfil se queda sin nivel de confianza",
+            todos.all { it.confianza in io.github.labandita.glreborn.core.PerfilDispositivo.Confianza.values() })
+        val p = listOf(
+            "app/src/main/java/io/github/labandita/glreborn/ui/Pantalla.kt",
+            "src/main/java/io/github/labandita/glreborn/ui/Pantalla.kt",
+        ).map { java.io.File(it) }.firstOrNull { it.exists() }
+        if (p != null) {
+            val s = p.readText()
+            check("el catálogo tiene filtro por confianza", s.contains("filtroConfianza"))
+            check("el filtro se recuerda al volver", s.contains("var filtroConfianza by rememberSaveable"))
+            check("el filtro enseña cuántos hay de cada tipo",
+                s.contains("PildorasMedidor") && s.contains("\"Verificados\" to"))
+        }
     }
 
     println()

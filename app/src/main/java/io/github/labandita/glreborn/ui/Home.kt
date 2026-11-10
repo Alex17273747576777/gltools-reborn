@@ -139,7 +139,7 @@ fun PantallaHome(
         Spacer(Modifier.height(26.dp))
         Rotulo("LO QUE EL TELÉFONO DICE")
         Spacer(Modifier.height(9.dp))
-        PildorasMedidor(medidor) { medidor = it }
+        PildorasMedidor(medidor, onMedidor = { medidor = it })
         Spacer(Modifier.height(14.dp))
         when (medidor) {
             0 -> PanelIdentidad(datosSonda, actual)
@@ -242,15 +242,22 @@ fun PantallaHome(
 
 /** El carrusel de medidores. Una píldora encendida; las demás, apagadas. Se desplaza. */
 @Composable
-private fun PildorasMedidor(elegido: Int, onMedidor: (Int) -> Unit) {
-    val nombres = listOf("Identidad", "Sonda", "Arquitectura", "Sistema", "Apps")
+internal fun PildorasMedidor(
+    elegido: Int,
+    onMedidor: (Int) -> Unit,
+    nombres: List<Any> = listOf("Identidad", "Sonda", "Arquitectura", "Sistema", "Apps"),
+) {
     Row(
         Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        nombres.forEachIndexed { i, nombre ->
+        nombres.forEachIndexed { i, elemento ->
+            // Una píldora puede ser sólo un nombre, o un nombre con su cuenta al lado
+            // («Verificados 12»). La cuenta es lo que hace útil un filtro.
+            val nombre = (elemento as? Pair<*, *>)?.first?.toString() ?: elemento.toString()
+            val cuenta = (elemento as? Pair<*, *>)?.second?.toString()
             val encendida = i == elegido
             // Muelle al encender: el mismo movimiento que en la barra de abajo, para que
             // toda la app responda con la misma física.
@@ -267,13 +274,26 @@ private fun PildorasMedidor(elegido: Int, onMedidor: (Int) -> Unit) {
                     .clickable { onMedidor(i) }
                     .padding(horizontal = 16.dp, vertical = 9.dp),
             ) {
-                Text(
-                    nombre,
-                    fontSize = 12.sp,
-                    fontWeight = if (encendida) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (encendida) Cristal.fondoAbajo else Cristal.textoSuave,
-                    maxLines = 1,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        nombre,
+                        fontSize = 12.sp,
+                        fontWeight = if (encendida) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (encendida) Cristal.fondoAbajo else Cristal.textoSuave,
+                        maxLines = 1,
+                    )
+                    if (cuenta != null) {
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            cuenta,
+                            fontSize = 10.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = if (encendida) Cristal.fondoAbajo.copy(alpha = 0.7f)
+                            else Cristal.textoTenue,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
         }
     }

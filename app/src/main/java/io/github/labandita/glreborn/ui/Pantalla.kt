@@ -93,6 +93,8 @@ fun PantallaPrincipal(
     onDescartarFalloLectura: () -> Unit = {},
 ) {
     var destino by rememberSaveable { mutableStateOf(Destino.HOME) }
+    // Qué confianza se está mostrando en el catálogo (0 = todas).
+    var filtroConfianza by rememberSaveable { mutableStateOf(0) }
     var pestana by rememberSaveable { mutableStateOf<Pestana?>(null) }
 
     // Estado de la sección Aprender. Vive aquí, no dentro del LazyColumn: la lambda de
@@ -192,8 +194,38 @@ fun PantallaPrincipal(
                     item { Etiqueta("EL TELÉFONO DICE AHORA") }
                     item { TablaActual(actual) }
                     item { Spacer(Modifier.height(6.dp)) }
+                    // Filtro por confianza. El catálogo mezcla perfiles verificados con fichas
+                    // sin comprobar, y no es lo mismo aplicar uno que otro. Antes había que
+                    // mirar la etiqueta de cada tarjeta; ahora se elige arriba y la lista cambia.
                     item { Etiqueta("CATÁLOGO · ${Perfiles.censo()}") }
-                    items(Perfiles.todos) { p ->
+                    item {
+                        PildorasMedidor(
+                            elegido = filtroConfianza,
+                            onMedidor = { filtroConfianza = it },
+                            nombres = listOf(
+                                "Todos" to Perfiles.todos.size,
+                                "Verificados" to Perfiles.todos.count {
+                                    it.confianza == PerfilDispositivo.Confianza.VERIFICADO
+                                },
+                                "Parciales" to Perfiles.todos.count {
+                                    it.confianza == PerfilDispositivo.Confianza.PARCIAL
+                                },
+                                "Sin verificar" to Perfiles.todos.count {
+                                    it.confianza == PerfilDispositivo.Confianza.SIN_VERIFICAR
+                                },
+                            ),
+                        )
+                    }
+                    items(
+                        Perfiles.todos.filter { p ->
+                            when (filtroConfianza) {
+                                1 -> p.confianza == PerfilDispositivo.Confianza.VERIFICADO
+                                2 -> p.confianza == PerfilDispositivo.Confianza.PARCIAL
+                                3 -> p.confianza == PerfilDispositivo.Confianza.SIN_VERIFICAR
+                                else -> true
+                            }
+                        },
+                    ) { p ->
                         TarjetaPerfil(p, perfilActivo?.id == p.id) { onPerfil(p) }
                     }
                     item { Spacer(Modifier.height(6.dp)) }
