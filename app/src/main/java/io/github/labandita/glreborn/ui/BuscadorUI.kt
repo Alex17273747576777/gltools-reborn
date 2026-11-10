@@ -176,3 +176,36 @@ private fun SinResultados(texto: String) {
         }
     }
 }
+
+/**
+ * Una caja de texto de una línea, para escribir un nombre.
+ *
+ * Se separa de [CajaBusqueda] porque aquélla dibuja resultados debajo y ésta no: dos cosas que
+ * se parecen pero no son lo mismo no deben compartir código sólo por parecerse.
+ */
+@Composable
+internal fun CajaTexto(
+    valor: String,
+    onValor: (String) -> Unit,
+    pista: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Cristal.superficieAlta)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        if (valor.isEmpty()) {
+            Text(pista, fontSize = 13.sp, color = Cristal.textoTenue)
+        }
+        BasicTextField(
+            value = valor,
+            onValueChange = onValor,
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 13.sp, color = Cristal.texto),
+            cursorBrush = SolidColor(Cristal.marca),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}

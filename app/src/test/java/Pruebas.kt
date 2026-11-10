@@ -2196,6 +2196,156 @@ run {
             main.readText().contains("isChangingConfigurations"))
     }
 
+
+    // ── 1.13.0: perfiles de diagnóstico personalizados, en JSON ──────────────
+    //
+    // Lo que había: UN perfil, en `clave=valor`, sin nombre, y los umbrales se enseñaban pero no
+    // se podían tocar. El usuario pidió perfiles personalizados. Para poder llevarlos de un
+    // teléfono a otro hacen falta nombre y un formato que otra herramienta entienda: JSON.
+    //
+    // El lector de JSON es propio porque `org.json` es del sistema Android y estas pruebas corren
+    // en una JVM normal. Y un lector propio que no se prueba es exactamente donde aparecen los
+    // fallos raros: por eso aquí se le mete basura a propósito.
+    println()
+    println("── perfiles de diagnóstico en JSON ──")
+    run {
+        val J = io.github.labandita.glreborn.core.MiniJson
+
+        // 1. Tipos básicos, ida y vuelta.
+        val original = linkedMapOf<String, Any?>(
+            "texto" to "Hola \"mundo\"\nlínea 2\ttab",
+            "entero" to 42,
+            "decimal" to 3.5,
+            "si" to true,
+            "no" to false,
+            "nada" to null,
+            "lista" to listOf(1, "dos", false, null),
+            "anidado" to linkedMapOf("a" to listOf(linkedMapOf("b" to "c"))),
+        )
+        val ida = J.escribir(original)
+        val vuelta = J.objeto(J.leer(ida))
+        check("el texto con comillas y saltos vuelve igual",
+            J.texto(vuelta, "texto") == "Hola \"mundo\"\nlínea 2\ttab")
+        check("los números vuelven igual",
+            J.entero(vuelta, "entero") == 42 && J.numero(vuelta, "decimal") == 3.5)
+        check("los booleanos vuelven igual",
+            J.booleano(vuelta, "si") == true && J.booleano(vuelta, "no") == false)
+        check("el nulo sigue siendo nulo", vuelta.containsKey("nada") && vuelta["nada"] == null)
+        check("las listas y lo anidado sobreviven",
+            J.lista(vuelta["lista"]!!).size == 4 &&
+                J.objeto(J.objeto(J.leer(ida))["anidado"]!!).containsKey("a"))
+        // Un entero no se convierte en 42.0 al escribirlo: si pasa, el JSON cambia sin motivo.
+        check("un entero se escribe como entero, no como 42.0", ida.contains("\"entero\": 42"))
+
+        // 2. Basura: se rechaza con la línea, no con un null silencioso.
+        fun rechaza(texto: String): String? =
+            runCatching { J.leer(texto) }.exceptionOrNull()?.message
+        check("una coma de más antes de «}» se detecta", rechaza("{\"a\": 1,}") != null)
+        check("una coma de más en una lista se detecta", rechaza("[1, 2,]") != null)
+        check("un objeto sin cerrar se detecta", rechaza("{\"a\": 1") != null)
+        check("una clave sin comillas se detecta", rechaza("{a: 1}") != null)
+        check("un salto de línea dentro de las comillas se detecta", rechaza("{\"a\": \"x\ny\"}") != null)
+        check("basura después del JSON se detecta", rechaza("{} basura") != null)
+        check("un comentario no es JSON válido y se dice", rechaza("{/* x */}") != null)
+        check("el error dice en qué línea está", rechaza("{\n\n  \"a\": ,}")?.contains("línea 3") == true)
+        check("un JSON válido no da error", rechaza("{\"a\": [1,2,{\"b\":null}]}") == null)
+
+        // 3. Los perfiles: tres de fábrica, uno activo, y nunca cero.
+        val R = io.github.labandita.glreborn.core.ReglasPerfilesJson
+        val fabrica = R.deFabrica()
+        check("vienen tres perfiles de fábrica", fabrica.size == 3)
+        check("exactamente uno está activo", fabrica.count { it.activo } == 1)
+        check("los nombres no se repiten", fabrica.map { it.nombre }.toSet().size == fabrica.size)
+
+        val (lista1, _) = R.anadir(fabrica, "Mi perfil", fabrica.first { it.activo }.perfil)
+        check("añadir uno nuevo funciona", lista1.size == 4)
+        check("y el nuevo queda activo", lista1.first { it.nombre == "Mi perfil" }.activo)
+        check("el anterior deja de estarlo", lista1.count { it.activo } == 1)
+        // Nombre repetido: se numera en vez de pisar el del usuario.
+        val (lista2, _) = R.anadir(lista1, "Mi perfil", fabrica[0].perfil)
+        check("un nombre repetido se numera, no se pisa", lista2.any { it.nombre == "Mi perfil 2" })
+        // Nombre vacío o con saltos de línea.
+        check("un nombre vacío se llama Personalizado", R.nombreLimpio("   ") == "Personalizado")
+        check("un nombre con saltos de línea se aplana",
+            !R.nombreLimpio("a\nb").contains("\n"))
+        check("un nombre larguísimo se recorta sin romper", R.nombreLimpio("x".repeat(200)).length <= 28)
+
+        // Borrar el activo deja otro en su sitio; borrar el último devuelve los de fábrica.
+        val sinActivo = R.borrar(lista1, "Mi perfil").first
+        check("borrar el activo deja uno activo", sinActivo.count { it.activo } == 1)
+        val vacio = R.borrar(listOf(fabrica[1]), fabrica[1].nombre)
+        check("borrar el último devuelve los de fábrica", vacio.first.size == 3)
+        check("y lo dice", vacio.second != null)
+
+        // El techo: no es una base de datos.
+        var grande = fabrica
+        repeat(R.MAX_PERFILES + 3) { i -> grande = R.anadir(grande, "P$i", fabrica[0].perfil).first }
+        check("la lista no pasa del máximo", grande.size == R.MAX_PERFILES)
+        check("y cuando está lleno, lo dice", R.anadir(grande, "otro", fabrica[0].perfil).second != null)
+
+        // 4. Ida y vuelta del JSON de perfiles, con sus avisos.
+        val json = R.codificar(lista1)
+        check("el JSON de perfiles se puede leer", json.contains("\"perfiles\""))
+        check("y se puede abrir a mano: lleva una nota", json.contains("\"nota\""))
+        val (recuperada, avisosLectura, roto) = R.decodificar(json)
+        check("los perfiles vuelven completos", recuperada.size == lista1.size)
+        check("sin avisos cuando el fichero está bien", avisosLectura.isEmpty(), avisosLectura.toString())
+        check("y no se marca como roto", !roto)
+        check("el activo vuelve a ser el mismo",
+            recuperada.first { it.activo }.nombre == lista1.first { it.activo }.nombre)
+        check("los umbrales vuelven exactos",
+            recuperada.first().perfil.umbralMemoriaPct == lista1.first().perfil.umbralMemoriaPct)
+
+        // Un fichero roto: no se pierde la app, se dice y se vuelve a fábrica.
+        val (rotos, avisosRotos, siRoto) = R.decodificar("{ esto no es json }")
+        check("un fichero roto devuelve los de fábrica", rotos.size == 3)
+        check("y se marca como roto para apartarlo", siRoto)
+        check("y dice por qué", avisosRotos.isNotEmpty())
+        val (sinLista, avisosSinLista, _) = R.decodificar("{\"formato\": 1}")
+        check("un fichero sin lista también se explica", avisosSinLista.isNotEmpty())
+        val (vacios, _, _) = R.decodificar("{\"perfiles\": []}")
+        check("una lista vacía no deja la app sin perfiles", vacios.size == 3)
+
+        // Un perfil con umbrales imposibles: se corrige y se dice qué se corrigió.
+        val absurdo = R.decodificar(
+            "{\"perfiles\": [{\"nombre\": \"X\", \"umbralMemoriaPct\": 900, " +
+                "\"umbralBateriaC\": 500, \"msCpu\": 999999, \"activo\": true}]}",
+        )
+        val x = absurdo.first.first()
+        check("un umbral de memoria imposible se ajusta", x.perfil.umbralMemoriaPct in 50..99)
+        check("un umbral de batería imposible se ajusta", x.perfil.umbralBateriaC <= 60.0)
+        check("una duración imposible se ajusta", x.perfil.msCpu <= 5000)
+        check("y el usuario se entera de qué se cambió", absurdo.second.isNotEmpty())
+
+        // Dos perfiles con el mismo nombre en el fichero: se distinguen al cargar.
+        val repetidos = R.decodificar(
+            "{\"perfiles\": [{\"nombre\": \"Igual\"}, {\"nombre\": \"Igual\", \"activo\": true}]}",
+        ).first
+        check("dos perfiles con el mismo nombre se renombran",
+            repetidos.map { it.nombre }.toSet().size == repetidos.size)
+
+        // 5. La pantalla: los umbrales se pueden tocar y los perfiles se ven.
+        val ui = java.io.File(uiDir, "PantallaDiagnostico.kt")
+        check("la pantalla de diagnóstico existe", ui.exists())
+        if (ui.exists()) {
+            val u = ui.readText()
+            check("la pantalla enseña los perfiles", u.contains("perfiles.forEach"))
+            check("y deja crear uno nuevo", u.contains("onCrearPerfil"))
+            check("los umbrales de memoria se editan", u.contains("umbralMemoriaPct ="))
+            check("los de batería también", u.contains("umbralBateriaC ="))
+        }
+        // Y el perfil se guarda al editar: si no, el ajuste se pierde al cerrar la app.
+        val main = java.io.File("src/main/java/io/github/labandita/glreborn/MainActivity.kt").let {
+            if (it.exists()) it else java.io.File("app/src/main/java/io/github/labandita/glreborn/MainActivity.kt")
+        }
+        check("editar un ajuste se guarda en el perfil activo",
+            main.exists() && main.readText().contains("PerfilesDiagnosticoJson(contexto).guardar"))
+        check("y se migra el perfil de la versión anterior, sin perderlo",
+            java.io.File("app/src/main/java/io/github/labandita/glreborn/core/PerfilesDiagnosticoJson.kt")
+                .let { f -> (if (f.exists()) f else java.io.File("src/main/java/io/github/labandita/glreborn/core/PerfilesDiagnosticoJson.kt")).readText() }
+                .contains("ajustes-diagnostico.txt"))
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

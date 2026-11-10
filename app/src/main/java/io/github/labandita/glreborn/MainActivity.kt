@@ -259,6 +259,9 @@ private fun App(
     // ── 1.12.0 · auto-diagnóstico, ranking y penetración
     var diagnosticoAuto by remember { mutableStateOf<DiagnosticoCompleto?>(null) }
     var perfilDiag by remember { mutableStateOf(PerfilDiagnostico()) }
+    // Varios perfiles con nombre, en JSON. Se cargan al abrir y se guardan al tocar cualquiera.
+    var perfilesDiag by remember { mutableStateOf<List<PerfilGuardado>>(emptyList()) }
+    var avisosPerfiles by remember { mutableStateOf<List<String>>(emptyList()) }
     var midiendo by remember { mutableStateOf(false) }
     var rutasInforme by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     // Lo que se puede compartir: lo que acaba de generar esta pantalla, o lo que generó el
@@ -342,8 +345,13 @@ private fun App(
             director.aplicado().fichas(apps.associate { it.paquete to it.nombre })
         } ?: emptyList()
         biblioteca = proteger("biblioteca") { director.biblioteca().leer() } ?: emptyList()
-        perfilDiag = proteger("perfil de diagnóstico") { PerfilesDiagnostico(contexto).leer() }
-            ?: PerfilDiagnostico()
+        val cargado = proteger("perfiles de diagnóstico") {
+            PerfilesDiagnosticoJson(contexto).leer()
+        }
+        perfilesDiag = cargado?.lista ?: ReglasPerfilesJson.deFabrica()
+        avisosPerfiles = cargado?.avisos ?: emptyList()
+        // El perfil en uso es el que se aplica: no hay dos verdades sobre qué se va a medir.
+        perfilDiag = ReglasPerfilesJson.activo(perfilesDiag)?.perfil ?: PerfilDiagnostico()
         ranking = proteger("ranking AnTuTu") { Antutu.top(contexto) } ?: emptyList()
         rankingAdemas = proteger("ranking · además") { Antutu.ademas(contexto) } ?: emptyList()
         if (estado == Director.Estado.SHIZUKU_SIN_PERMISO) {
@@ -585,13 +593,48 @@ private fun App(
             }
         },
         onPerfilDiagnostico = { p ->
-            val (valido, avisos) = PerfilesDiagnostico(contexto).guardar(p)
+            // Editar un ajuste se guarda en el perfil que está en uso. Antes sólo cambiaba en
+            // memoria y al reabrir la app volvía a estar como antes: un ajuste que no se guarda
+            // no es un ajuste, es un botón que hace un dibujo.
+            val (valido, avisos) = ReglasPerfilDiagnostico.validar(p)
             perfilDiag = valido
-            if (avisos.isNotEmpty()) {
-                resultado = Resultado(false, Via.NINGUNA, avisos.joinToString(" · "))
+            val enUso = ReglasPerfilesJson.activo(perfilesDiag)
+            if (enUso != null) {
+                val nuevos = perfilesDiag.map {
+                    if (it.nombre == enUso.nombre) it.copy(perfil = valido.copy(nombre = it.nombre)) else it
+                }
+                perfilesDiag = nuevos
+                PerfilesDiagnosticoJson(contexto).guardar(nuevos)
             }
+            avisosPerfiles = avisos
         },
         rutasInforme = rutasInforme,
+        perfilesDiagnostico = perfilesDiag,
+        avisosPerfilesDiag = avisosPerfiles,
+        onElegirPerfilDiag = { nombre ->
+            val nuevos = ReglasPerfilesJson.normalizarActivo(
+                perfilesDiag.map { it.copy(activo = it.nombre == nombre) },
+            )
+            perfilesDiag = nuevos
+            perfilDiag = ReglasPerfilesJson.activo(nuevos)?.perfil ?: perfilDiag
+            PerfilesDiagnosticoJson(contexto).guardar(nuevos)
+        },
+        onBorrarPerfilDiag = { nombre ->
+            val (nuevos, aviso) = ReglasPerfilesJson.borrar(perfilesDiag, nombre)
+            perfilesDiag = nuevos
+            perfilDiag = ReglasPerfilesJson.activo(nuevos)?.perfil ?: perfilDiag
+            avisosPerfiles = listOfNotNull(aviso)
+            PerfilesDiagnosticoJson(contexto).guardar(nuevos)
+        },
+        onCrearPerfilDiag = { nombre ->
+            // El perfil nuevo copia el que está en uso: se crea desde algo, no desde cero.
+            val base = ReglasPerfilesJson.activo(perfilesDiag)?.perfil ?: perfilDiag
+            val (nuevos, aviso) = ReglasPerfilesJson.anadir(perfilesDiag, nombre, base)
+            perfilesDiag = nuevos
+            perfilDiag = ReglasPerfilesJson.activo(nuevos)?.perfil ?: perfilDiag
+            avisosPerfiles = listOfNotNull(aviso)
+            PerfilesDiagnosticoJson(contexto).guardar(nuevos)
+        },
         puedeCompartirInforme = informeReciente.isNotEmpty() || Informes.ultimas().isNotEmpty(),
         onCompartirInforme = {
             val rutas = informeReciente.ifEmpty { Informes.ultimas() }

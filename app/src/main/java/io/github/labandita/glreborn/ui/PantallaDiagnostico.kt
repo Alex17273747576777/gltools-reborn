@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +43,11 @@ fun ContenidoDiagnostico(
     onGuardar: () -> Unit,
     puedeCompartir: Boolean,
     onCompartir: () -> Unit,
+    perfiles: List<io.github.labandita.glreborn.core.PerfilGuardado> = emptyList(),
+    onElegirPerfil: (String) -> Unit = {},
+    onBorrarPerfil: (String) -> Unit = {},
+    onCrearPerfil: (String) -> Unit = {},
+    avisosPerfiles: List<String> = emptyList(),
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Aviso(
@@ -80,6 +86,64 @@ fun ContenidoDiagnostico(
             fontSize = 11.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
         )
 
+        // ── Perfiles con nombre. Varios, en JSON, y se puede crear uno nuevo con el nombre que
+        //    quieras a partir del que está activo. Antes había uno solo y no se podía tocar.
+        Etiqueta("PERFILES DE MEDICIÓN")
+        perfiles.forEach { pg ->
+            Fila {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        pg.nombre,
+                        fontSize = 13.sp, color = if (pg.activo) Cristal.marca else Cristal.texto,
+                        fontWeight = if (pg.activo) FontWeight.SemiBold else FontWeight.Normal,
+                    )
+                    Text(
+                        (if (pg.perfil.profundo) "completo" else "rápido") +
+                            " · CPU ${pg.perfil.msCpu} ms · " +
+                            "${pg.perfil.pruebas.size} pruebas · memoria ${pg.perfil.umbralMemoriaPct} %" +
+                            (if (pg.perfil.alCerrar) " · informe al cerrar" else ""),
+                        fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.textoSuave,
+                    )
+                }
+                if (!pg.activo) {
+                    Boton("Usar", Cristal.superficieMasAlta, Modifier.width(72.dp)) {
+                        onElegirPerfil(pg.nombre)
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Boton("Borrar", Cristal.superficieMasAlta, Modifier.width(76.dp)) {
+                        onBorrarPerfil(pg.nombre)
+                    }
+                } else {
+                    Text("en uso", fontSize = 11.sp, color = Cristal.marca)
+                }
+            }
+            Hilo()
+        }
+        val nombreNuevo = remember { androidx.compose.runtime.mutableStateOf("") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            CajaTexto(
+                valor = nombreNuevo.value,
+                onValor = { nombreNuevo.value = it },
+                pista = "nombre del perfil nuevo",
+                modifier = Modifier.weight(1f),
+            )
+            Boton("Crear", Cristal.marca, Modifier.width(88.dp)) {
+                if (nombreNuevo.value.isNotBlank()) {
+                    onCrearPerfil(nombreNuevo.value)
+                    nombreNuevo.value = ""
+                }
+            }
+        }
+        Text(
+            "El perfil nuevo copia los ajustes del que esté en uso y se puede editar después con " +
+                "los controles de abajo. Se guardan en perfiles-diagnostico.json, dentro de la " +
+                "app: ni un dato sale del teléfono.",
+            fontSize = 11.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
+        )
+        avisosPerfiles.forEach { a ->
+            Text("· $a", fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.ambar)
+        }
+
         Etiqueta("PERFIL DE MEDICIÓN")
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Fila { TextoPerfil("Duración de CPU", "${perfil.msCpu} ms") }
@@ -97,6 +161,31 @@ fun ContenidoDiagnostico(
                 )
             }
         }
+        // Los umbrales se avisaban pero no se podían cambiar: un número que se enseña y no se
+        // puede tocar es un número decorativo.
+        PildorasMedidor(
+            elegido = when (perfil.umbralMemoriaPct) {
+                in 0..80 -> 0
+                in 81..89 -> 1
+                in 90..94 -> 2
+                else -> 3
+            },
+            onMedidor = { i ->
+                onPerfil(perfil.copy(umbralMemoriaPct = when (i) { 0 -> 80; 1 -> 85; 2 -> 90; else -> 95 }))
+            },
+            nombres = listOf("Aviso 80 %", "85 %", "90 %", "95 %"),
+        )
+        PildorasMedidor(
+            elegido = when {
+                perfil.umbralBateriaC <= 38.0 -> 0
+                perfil.umbralBateriaC <= 42.0 -> 1
+                else -> 2
+            },
+            onMedidor = { i ->
+                onPerfil(perfil.copy(umbralBateriaC = when (i) { 0 -> 38.0; 1 -> 42.0; else -> 46.0 }))
+            },
+            nombres = listOf("Batería 38 °C", "42 °C", "46 °C"),
+        )
         PildorasMedidor(
             elegido = when (perfil.msCpu) {
                 in 0..200 -> 0

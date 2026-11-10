@@ -63,6 +63,11 @@ fun PantallaPrincipal(
     onGuardarInforme: () -> Unit = {},
     puedeCompartirInforme: Boolean = false,
     onCompartirInforme: () -> Unit = {},
+    perfilesDiagnostico: List<io.github.labandita.glreborn.core.PerfilGuardado> = emptyList(),
+    onElegirPerfilDiag: (String) -> Unit = {},
+    onBorrarPerfilDiag: (String) -> Unit = {},
+    onCrearPerfilDiag: (String) -> Unit = {},
+    avisosPerfilesDiag: List<String> = emptyList(),
     ranking: List<FichaAntutu> = emptyList(),
     rankingAdemas: List<FichaAntutu> = emptyList(),
     rankingConsultado: String = "",
@@ -1021,6 +1026,11 @@ fun PantallaPrincipal(
                             onGuardar = onGuardarInforme,
                             puedeCompartir = puedeCompartirInforme,
                             onCompartir = onCompartirInforme,
+                            perfiles = perfilesDiagnostico,
+                            onElegirPerfil = onElegirPerfilDiag,
+                            onBorrarPerfil = onBorrarPerfilDiag,
+                            onCrearPerfil = onCrearPerfilDiag,
+                            avisosPerfiles = avisosPerfilesDiag,
                         )
                     }
                 }
