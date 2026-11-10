@@ -37,6 +37,13 @@ BT="$ANDROID_HOME/build-tools/35.0.0"
 
 paso() { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
 
+# Lo demás que puede hacer fallar el cierre a medias también se mira antes de tocar nada.
+[ -n "$TOKEN" ] || { echo "~/.gh-tokens está vacío"; exit 1; }
+[ -f "$REBORN_KEYSTORE" ] || { echo "falta el keystore $REBORN_KEYSTORE: sin él no hay APK que publicar"; exit 1; }
+[ -x "$BT/apksigner" ] || { echo "falta $BT/apksigner"; exit 1; }
+# El token viaja en una cabecera, no en la URL: en la URL acaba en el historial y en los errores de git.
+AUTH="Authorization: Basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)"
+
 # 1. La versión, en los tres sitios donde vive. Si no coinciden, el APK miente.
 paso "Versión $VERSION en build.gradle, MainActivity y RegistroFallos"
 # Idempotente: si ya está en esa versión, no se sube el código otra vez. Un script que no se
@@ -95,14 +102,19 @@ find "$HOME/appteka" -maxdepth 1 -name 'GLTools-Reborn-*.apk' ! -name "*-$VERSIO
 # 6. Commit y push.
 paso "Commit y push"
 git add -A
+# `git add -A` se lleva todo lo que haya en la carpeta. Un keystore o un token que se cuele aquí
+# queda publicado para siempre: se mira lo preparado y se para antes del commit.
+if git diff --cached --name-only | grep -Ei '\.(jks|keystore|p12|pem)$|(^|/)\.pass$|gh-tokens|(^|/)\.tokens$'; then
+  git reset -q; echo "¡hay un secreto entre lo preparado! (arriba). No se hace commit."; exit 1
+fi
 git -c user.name="Alex" -c user.email="alex@labandita.dev" \
   commit -q -m "$VERSION: $TITULO" || echo "  (nada nuevo que commitear)"
-git push "https://Alex17273747576777:$TOKEN@github.com/$REPO.git" HEAD:main
+git -c http.extraheader="$AUTH" push "https://github.com/$REPO.git" HEAD:main
 
 # 7. Release con sus cuatro adjuntos.
 paso "Release v$VERSION"
 RID=$(python3 - "$TOKEN" "$VERSION" "$TITULO" "$REPO" "$NOTAS" <<'PY'
-import json, sys, urllib.request
+import json, sys, urllib.error, urllib.request
 tok, ver, titulo, repo = sys.argv[1:5]
 # El cuerpo de la release se toma del archivo del tramo, NO de un /tmp que sobreviva de la vez
 # anterior. Pasó de verdad y durante cinco versiones: 1.9.9, 1.10.0, 1.11.0 y 1.12.0 se publicaron
@@ -115,8 +127,22 @@ cuerpo = open(nota).read()
 if len(cuerpo.strip()) < 80:
     raise SystemExit(f"{nota} es demasiado corta para contar lo que cambió")
 datos = json.dumps({"tag_name": f"v{ver}", "name": f"GLTools Reborn {ver}", "body": cuerpo}).encode()
-r = urllib.request.Request(f"https://api.github.com/repos/{repo}/releases", data=datos, method="POST",
-    headers={"Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json", "User-Agent": "cierre"})
+cab = {"Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json", "User-Agent": "cierre"}
+base = f"https://api.github.com/repos/{repo}/releases"
+# Segunda pasada sobre la misma versión: la release ya existe. Se actualiza su nota y se reutiliza,
+# en vez de morir con un 422 a medio cierre.
+try:
+    previa = json.load(urllib.request.urlopen(urllib.request.Request(f"{base}/tags/v{ver}", headers=cab)))
+except urllib.error.HTTPError as e:
+    if e.code != 404:
+        raise
+    previa = None
+if previa:
+    r = urllib.request.Request(f"{base}/{previa['id']}", data=datos, method="PATCH", headers=cab)
+    for a in previa.get("assets", []):   # los adjuntos viejos estorban: un nombre repetido da 422
+        urllib.request.urlopen(urllib.request.Request(f"{base}/assets/{a['id']}", method="DELETE", headers=cab))
+else:
+    r = urllib.request.Request(base, data=datos, method="POST", headers=cab)
 print(json.load(urllib.request.urlopen(r))["id"])
 PY
 )

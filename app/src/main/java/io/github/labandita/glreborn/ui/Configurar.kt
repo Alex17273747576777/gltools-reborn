@@ -82,7 +82,7 @@ fun PantallaConfigurar(
                                 .width(18.dp)
                                 .height(2.dp)
                                 .clip(RoundedCornerShape(1.dp))
-                                .background(if (activa) Cristal.cian else Cristal.superficie.copy(alpha = 0f)),
+                                .background(if (activa) Cristal.marca else Cristal.superficie.copy(alpha = 0f)),
                         )
                     }
                 }
@@ -178,7 +178,7 @@ private fun FilaOpcion(f: FilaConfig, onAlternar: (String) -> Unit) {
 private fun EtiquetaConsecuencia(e: FilaConfig.Etiqueta) {
     val (texto, color) = when (e) {
         FilaConfig.Etiqueta.RENDIMIENTO -> "Rendimiento" to Cristal.verde
-        FilaConfig.Etiqueta.COMPATIBILIDAD -> "Compatibilidad" to Cristal.cian
+        FilaConfig.Etiqueta.COMPATIBILIDAD -> "Compatibilidad" to Cristal.marca
         FilaConfig.Etiqueta.CALIDAD -> "Calidad" to Cristal.marca
         FilaConfig.Etiqueta.MEMORIA -> "Memoria" to Cristal.ambar
         FilaConfig.Etiqueta.PELIGRO -> "Con riesgo" to Cristal.rojo
@@ -198,7 +198,7 @@ private fun EtiquetaConsecuencia(e: FilaConfig.Etiqueta) {
 private fun Casilla(marcada: Boolean, habilitada: Boolean) {
     val color = when {
         !habilitada -> Cristal.bordeLuz
-        marcada -> Cristal.cian
+        marcada -> Cristal.marca
         else -> Cristal.textoSuave
     }
     Box(
@@ -246,7 +246,7 @@ private fun TarjetaPlantilla(
                     Modifier.size(38.dp).clip(RoundedCornerShape(12.dp))
                         .background(Cristal.superficieMasAlta),
                     contentAlignment = Alignment.Center,
-                ) { Iconos.Espadas(tamano = 19.dp, color = Cristal.cian) }
+                ) { Iconos.Espadas(tamano = 19.dp, color = Cristal.marca) }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(perfil.nombre, fontSize = 14.sp, color = Cristal.texto,

@@ -3,16 +3,13 @@ package io.github.labandita.glreborn.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import io.github.labandita.glreborn.R
-import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -21,17 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/**
- * Liquid Glass — el lenguaje visual de iOS 26, aplicado aquí.
- *
- * La referencia es ReDantotsu / Kiroku (apps de anime y manga), no este sitio de
- * módulos: superficies translúcidas con desenfoque real, bordes de luz, barra
- * inferior en forma de píldora y animaciones con muelle.
- *
- * Nada de esto carga fuentes ni imágenes de internet: el fondo son degradados
- * dibujados por código, y el cristal es `blur()` de Compose sobre lo que hay detrás.
- * En modo avión se ve igual.
- */
+/** Superficies neutras y un acento de marca; sin degradados ni alias de paleta. */
 object Cristal {
     /*
       ── RELECTURA DEL TEMA, 1.8.1 ────────────────────────────────────────────────
@@ -72,11 +59,6 @@ object Cristal {
     val ambar = Color(0xFFFFB020)
     val rojo = Color(0xFFFF5A6E)
 
-    // Compatibilidad: nombres antiguos que aún usan las pantallas que no se han
-    // reescrito. Apuntan a la paleta nueva para que TODO el blanco y negro cuadre.
-    val violeta = marca
-    val cian = marca
-    val rosa = superficieMasAlta
 
     val texto = Color(0xFFEDF1F7)
     val textoSuave = Color(0xFF98A2B3)
@@ -90,16 +72,12 @@ object Cristal {
     val vidrio = Color(0xFF14181E)
     val vidrioFuerte = Color(0xFF232A34)
 
-    val degradadoFondo = Brush.verticalGradient(listOf(fondoArriba, fondoMedio, fondoAbajo))
-    /** Ya no hay degradado de acento: un degradado era el adorno que había que quitar. */
-    val degradadoAcento = Brush.linearGradient(listOf(marca, marca))
-    val degradadoCalido = Brush.linearGradient(listOf(marca, marca))
 }
 
 private val esquema = darkColorScheme(
-    primary = Cristal.violeta,
-    onPrimary = Color(0xFF12081F),
-    secondary = Cristal.cian,
+    primary = Cristal.marca,
+    onPrimary = Cristal.fondoAbajo,
+    secondary = Cristal.marca,
     background = Cristal.fondoArriba,
     onBackground = Cristal.texto,
     surface = Cristal.fondoMedio,

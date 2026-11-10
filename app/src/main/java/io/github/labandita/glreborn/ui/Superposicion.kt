@@ -80,7 +80,7 @@ fun PantallaSuperposicion(
         // ── Estado. Verde si está dibujando, ámbar si falta permiso.
         val color = when {
             activo -> Cristal.verde
-            tienePermiso -> Cristal.cian
+            tienePermiso -> Cristal.marca
             else -> Cristal.ambar
         }
         Row(
@@ -247,7 +247,7 @@ fun PantallaSuperposicion(
                 Modifier
                     .width(42.dp).height(24.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (a.fps) Cristal.cian else Cristal.superficieMasAlta)
+                    .background(if (a.fps) Cristal.marca else Cristal.superficieMasAlta)
                     .padding(3.dp),
                 contentAlignment = if (a.fps) Alignment.CenterEnd else Alignment.CenterStart,
             ) {

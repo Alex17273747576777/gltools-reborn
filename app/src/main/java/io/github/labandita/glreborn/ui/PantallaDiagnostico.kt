@@ -46,7 +46,7 @@ fun ContenidoDiagnostico(
             "Estas pruebas se ejecutan AHORA en tu teléfono y dan números de tu aparato, no " +
                 "puntuaciones comparables. Lo que Android no deja leer sin root (temperatura de " +
                 "CPU, procesos, GPU) se marca «no medido» con su motivo: no se estima.",
-            Cristal.cian,
+            Cristal.marca,
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -128,7 +128,7 @@ fun ContenidoDiagnostico(
                 Text(
                     if (fallo.isBlank()) ruta else "no se pudo: $fallo",
                     fontSize = 11.sp, lineHeight = 16.sp,
-                    color = if (fallo.isBlank()) Cristal.cian else Cristal.rojo,
+                    color = if (fallo.isBlank()) Cristal.marca else Cristal.rojo,
                     fontFamily = FontFamily.Monospace,
                 )
             }
@@ -264,7 +264,7 @@ private fun FilaRanking(
                 Text("no aplicable: falta el device", fontSize = 11.sp, color = Cristal.ambar)
             }
             Text(
-                "crear perfil", fontSize = 12.sp, color = Cristal.cian, fontWeight = FontWeight.SemiBold,
+                "crear perfil", fontSize = 12.sp, color = Cristal.marca, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.clickable { onCrearPerfil(f) },
             )
         }

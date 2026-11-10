@@ -2,17 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!--
-      PERMISO DE RED, DELIBERADAMENTE ACOTADO.
-
-      La app sigue funcionando SIN red: perfiles, panel y lectura del teléfono no tocan
-      internet. Este permiso existe sólo para la búsqueda OPCIONAL de la sección
-      «Aprender» (buscar un dispositivo y ver sus datos). Con `red_segura.xml` no hay
-      ningún dominio de confianza ni tráfico en claro permitido, así que en la práctica
-      el sistema no puede abrir conexiones: lo que no esté en la app, no se descarga.
-      Si algún día se quiere cerrar del todo, se borra esta línea y ya está.
-    -->
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Sin permiso INTERNET: el panel se sirve desde assets mediante WebViewAssetLoader. -->
 
     <!-- Notificaciones: sólo para avisar de la reversión automática de resolución. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

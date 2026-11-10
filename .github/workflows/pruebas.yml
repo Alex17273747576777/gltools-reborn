@@ -1,0 +1,27 @@
+name: pruebas
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  nucleo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Sin alias de paleta ni degradados falsos
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          theme = Path('app/src/main/java/io/github/labandita/glreborn/ui/Tema.kt').read_text()
+          assert not re.search(r'val\s+(violeta|cian|rosa|degradado\w*)\s*=', theme)
+          assert 'Brush.linearGradient(listOf(marca, marca))' not in theme
+          manifest = Path('app/src/main/AndroidManifest.xml').read_text()
+          assert 'android:name="android.permission.INTERNET"' not in manifest
+          PY
+      - name: Compilar y probar el núcleo
+        run: bash ./gradlew :app:pruebasNucleo --no-daemon --console=plain

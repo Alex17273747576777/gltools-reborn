@@ -454,7 +454,7 @@ private fun App(
                         color = Cristal.texto)
                     Text(
                         "Cerrar",
-                        fontSize = 13.sp, color = Cristal.violeta, fontWeight = FontWeight.Medium,
+                        fontSize = 13.sp, color = Cristal.marca, fontWeight = FontWeight.Medium,
                         modifier = androidx.compose.ui.Modifier.clickable { panelDe = null },
                     )
                 }

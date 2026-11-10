@@ -155,7 +155,7 @@ fun PantallaPrincipal(
             Column {
                 Text(
                     "GLTOOLS",
-                    fontSize = 10.sp, letterSpacing = 3.sp, color = Cristal.cian,
+                    fontSize = 10.sp, letterSpacing = 3.sp, color = Cristal.marca,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
@@ -316,7 +316,7 @@ fun PantallaPrincipal(
                                     "top500.org entre 2019 y 2025, con los XML originales dentro " +
                                     "del APK. Elige una y salen sus 500 sistemas tal como se " +
                                     "publicaron.",
-                                Cristal.cian,
+                                Cristal.marca,
                             )
                         }
                         item {
@@ -560,7 +560,7 @@ fun PantallaPrincipal(
                                             modifier = Modifier.weight(1f))
                                         Text(
                                             "encaje ${r.puntuacion}",
-                                            fontSize = 10.sp, color = Cristal.cian,
+                                            fontSize = 10.sp, color = Cristal.marca,
                                         )
                                     }
                                     Text(
@@ -714,7 +714,7 @@ fun PantallaPrincipal(
                                 ) {
                                     Text(s.soc, fontSize = 12.sp, color = Cristal.texto,
                                         fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                                    Text(s.gpu, fontSize = 11.sp, color = Cristal.cian)
+                                    Text(s.gpu, fontSize = 11.sp, color = Cristal.marca)
                                 }
                                 if (s.resumen.isNotBlank()) {
                                     Text(s.resumen, fontSize = 10.sp, color = Cristal.textoSuave)
@@ -777,7 +777,7 @@ fun PantallaPrincipal(
                                     Text(c.generado.estrategia.titulo, fontSize = 13.sp,
                                         color = Cristal.texto, fontWeight = FontWeight.SemiBold)
                                     Text(c.generado.perfil.nombre, fontSize = 11.sp,
-                                        color = Cristal.cian)
+                                        color = Cristal.marca)
                                 }
                                 Text("${c.encaje}", fontSize = 18.sp, color = Cristal.marca,
                                     fontWeight = FontWeight.Bold)
@@ -827,7 +827,7 @@ fun PantallaPrincipal(
                         )
                     }
                     item {
-                        Boton("Extraer", Cristal.cian, Modifier.fillMaxWidth()) {
+                        Boton("Extraer", Cristal.marca, Modifier.fillMaxWidth()) {
                             extraido = if (textoPegado.isBlank()) null
                             else Extractor.extraer(textoPegado)
                         }
@@ -909,7 +909,7 @@ fun PantallaPrincipal(
                                 "trabajando a la vez dentro de este teléfono, cada uno con su " +
                                 "criterio, y un encaje que mide parecido con tu aparato. No es " +
                                 "una red de máquinas: llamarlo así sería vender otra cosa.",
-                            Cristal.cian,
+                            Cristal.marca,
                         )
                     }
                     item { Spacer(Modifier.height(10.dp)) }
@@ -1002,7 +1002,7 @@ fun PantallaPrincipal(
                                 "root para cosas que esta app no puede hacer. Ninguno se ha " +
                                 "copiado: no publican código, publican fichas. Lo que hay aquí " +
                                 "está escrito desde cero con comandos documentados de Android.",
-                            Cristal.cian,
+                            Cristal.marca,
                         )
                     }
                 }
@@ -1585,7 +1585,7 @@ private fun FilaMovimiento(m: Movimiento) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         if (m.fuente == Movimiento.FUENTE_REGISTRO) "propiedad" else m.donde,
-                        fontSize = 10.sp, color = Cristal.cian, fontWeight = FontWeight.Medium,
+                        fontSize = 10.sp, color = Cristal.marca, fontWeight = FontWeight.Medium,
                     )
                     if (!m.reversible) Text(
                         "sin vuelta atrás", fontSize = 10.sp, color = Cristal.rojo,
@@ -1684,7 +1684,7 @@ private fun FilaSistemaTop(s: Datos.Sistema) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "${s.rank}",
-                fontSize = 12.sp, color = Cristal.cian, fontWeight = FontWeight.Bold,
+                fontSize = 12.sp, color = Cristal.marca, fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.width(34.dp),
             )
@@ -1749,7 +1749,7 @@ private fun TarjetaRendimiento(
         Text("COMANDO", fontSize = 8.sp, letterSpacing = 1.sp, color = Cristal.textoSuave)
         Text(
             a.comandosLegibles,
-            fontSize = 10.sp, color = Cristal.cian, fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp, color = Cristal.marca, fontFamily = FontFamily.Monospace,
             lineHeight = 15.sp,
         )
         Spacer(Modifier.height(4.dp))
@@ -1788,7 +1788,7 @@ fun PantallaArrancando(error: String? = null) {
         ) {
             Text(
                 "GLTOOLS",
-                fontSize = 13.sp, letterSpacing = 5.sp, color = Cristal.cian,
+                fontSize = 13.sp, letterSpacing = 5.sp, color = Cristal.marca,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(10.dp))

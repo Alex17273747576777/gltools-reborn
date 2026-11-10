@@ -87,7 +87,7 @@ fun PantallaFallo(
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             Box(
                 Modifier.weight(1f).clip(RoundedCornerShape(15.dp))
-                    .background(Cristal.cian).clickable { onCopiar(informe) }
+                    .background(Cristal.marca).clickable { onCopiar(informe) }
                     .padding(vertical = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {
