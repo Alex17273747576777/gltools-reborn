@@ -94,7 +94,7 @@ fun PantallaSuperposicion(
             }
         } else if (activo) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BotonPlano("Mover el punto", Cristal.vidrioFuerte, Modifier.weight(1f)) { onMover() }
+                BotonPlano("Mover el punto", Cristal.superficieMasAlta, Modifier.weight(1f)) { onMover() }
                 BotonPlano("Quitar", Cristal.rojo, Modifier.weight(1f)) { onDesactivar() }
             }
         } else {
@@ -112,8 +112,7 @@ fun PantallaSuperposicion(
                 .fillMaxWidth()
                 .height(150.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .background(Cristal.fondoAbajo)
-                .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(20.dp)),
+                .background(Cristal.fondoAbajo),
             contentAlignment = Alignment.Center,
         ) {
             VistaPreviaMira(a)
@@ -199,7 +198,7 @@ fun PantallaSuperposicion(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(Cristal.vidrio)
+                .background(Cristal.superficie)
                 .clickable { onCambiar(a.copy(fps = !a.fps)) }
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -216,7 +215,7 @@ fun PantallaSuperposicion(
                 Modifier
                     .width(42.dp).height(24.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(if (a.fps) Cristal.cian else Cristal.vidrioFuerte)
+                    .background(if (a.fps) Cristal.cian else Cristal.superficieMasAlta)
                     .padding(3.dp),
                 contentAlignment = if (a.fps) Alignment.CenterEnd else Alignment.CenterStart,
             ) {
@@ -279,13 +278,8 @@ private fun Segmento(
 ) {
     Box(
         modifier
-            .clip(RoundedCornerShape(13.dp))
-            .background(if (elegido) Cristal.vidrioFuerte else Cristal.vidrio)
-            .border(
-                1.dp,
-                if (elegido) Cristal.cian.copy(alpha = 0.45f) else Cristal.bordeLuz,
-                RoundedCornerShape(13.dp),
-            )
+            .clip(RoundedCornerShape(50))
+            .background(if (elegido) Cristal.marca else Cristal.superficieAlta)
             .clickable { onClick() }
             .padding(vertical = 11.dp),
         contentAlignment = Alignment.Center,

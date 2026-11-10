@@ -139,7 +139,7 @@ fun PantallaPrincipal(
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(20.dp))
-                        .background(Cristal.vidrio)
+                        .background(Cristal.superficie)
                         .clickable { onRefrescar() }
                         .padding(horizontal = 11.dp, vertical = 5.dp),
                 ) {
@@ -199,7 +199,7 @@ fun PantallaPrincipal(
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Boton("Aplicar perfil", Cristal.verde, Modifier.weight(1f)) { onAplicar() }
-                            Boton("Restaurar", Cristal.vidrioFuerte, Modifier.weight(1f)) { onRestaurar() }
+                            Boton("Restaurar", Cristal.superficieMasAlta, Modifier.weight(1f)) { onRestaurar() }
                         }
                     }
                     item {
@@ -256,7 +256,7 @@ fun PantallaPrincipal(
                                             .clip(RoundedCornerShape(12.dp))
                                             .background(
                                                 if (sel) Cristal.marca.copy(alpha = 0.25f)
-                                                else Cristal.vidrioFuerte
+                                                else Cristal.superficieMasAlta
                                             )
                                             .clickable { onEdicion(e.edicion) }
                                             .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -321,7 +321,7 @@ fun PantallaPrincipal(
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             pantallaActual?.let { a ->
                                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                                    .background(Cristal.vidrio).padding(12.dp),
+                                    .background(Cristal.superficie).padding(12.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text("Actual", fontSize = 11.sp, color = Cristal.textoSuave)
                                     Text("${a.resolucion} @ ${a.densidad}dpi", fontSize = 12.sp,
@@ -332,10 +332,10 @@ fun PantallaPrincipal(
                                 "sola para que todo siga del mismo tamaño.",
                                 fontSize = 11.sp, lineHeight = 15.sp, color = Cristal.textoSuave)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Boton("720p", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                Boton("720p", Cristal.superficieMasAlta, Modifier.weight(1f)) {
                                     onFijarResolucion(720, 1600, 293)
                                 }
-                                Boton("1080p", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                Boton("1080p", Cristal.superficieMasAlta, Modifier.weight(1f)) {
                                     onFijarResolucion(1080, 2400, 440)
                                 }
                                 Boton("Volver", Cristal.ambar, Modifier.weight(1f)) { onRevertirPantalla() }
@@ -349,9 +349,9 @@ fun PantallaPrincipal(
                     }
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Boton("60 Hz", Cristal.vidrioFuerte, Modifier.weight(1f)) { onFijarRefresco(60) }
-                            Boton("90 Hz", Cristal.vidrioFuerte, Modifier.weight(1f)) { onFijarRefresco(90) }
-                            Boton("120 Hz", Cristal.vidrioFuerte, Modifier.weight(1f)) { onFijarRefresco(120) }
+                            Boton("60 Hz", Cristal.superficieMasAlta, Modifier.weight(1f)) { onFijarRefresco(60) }
+                            Boton("90 Hz", Cristal.superficieMasAlta, Modifier.weight(1f)) { onFijarRefresco(90) }
+                            Boton("120 Hz", Cristal.superficieMasAlta, Modifier.weight(1f)) { onFijarRefresco(120) }
                         }
                     }
 
@@ -359,14 +359,14 @@ fun PantallaPrincipal(
                     item { Etiqueta("SISTEMA") }
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Boton("Anim 0.5x", Cristal.vidrioFuerte, Modifier.weight(1f)) { onAnimaciones("0.5") }
-                            Boton("Anim 1x", Cristal.vidrioFuerte, Modifier.weight(1f)) { onAnimaciones("1.0") }
+                            Boton("Anim 0.5x", Cristal.superficieMasAlta, Modifier.weight(1f)) { onAnimaciones("0.5") }
+                            Boton("Anim 1x", Cristal.superficieMasAlta, Modifier.weight(1f)) { onAnimaciones("1.0") }
                         }
                     }
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Boton("DNS Google", Cristal.vidrioFuerte, Modifier.weight(1f)) { onDns("dns.google") }
-                            Boton("DNS Cloudflare", Cristal.vidrioFuerte, Modifier.weight(1f)) { onDns("1dot1dot1dot1.cloudflare-dns.com") }
+                            Boton("DNS Google", Cristal.superficieMasAlta, Modifier.weight(1f)) { onDns("dns.google") }
+                            Boton("DNS Cloudflare", Cristal.superficieMasAlta, Modifier.weight(1f)) { onDns("1dot1dot1dot1.cloudflare-dns.com") }
                         }
                     }
                     item {
@@ -424,7 +424,7 @@ fun PantallaPrincipal(
                             Perfiles.todos.map { it.gpu }.distinct().forEach { g ->
                                 Row(
                                     Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                                        .background(Cristal.vidrio).padding(12.dp),
+                                        .background(Cristal.superficie).padding(12.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
                                     Text(g, fontSize = 13.sp, color = Cristal.texto)
@@ -476,8 +476,7 @@ fun PantallaPrincipal(
                             }
                         } else {
                             items(hallados) { r ->
-                                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(14.dp)).padding(13.dp)) {
+                                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Cristal.superficie).padding(13.dp)) {
                                     Row(
                                         Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -500,7 +499,7 @@ fun PantallaPrincipal(
                                             onSeleccionarPerfil(r.perfil)
                                         }
                                         if (biblioteca.any { it.id == r.perfil.id }) {
-                                            Boton("Borrar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                            Boton("Borrar", Cristal.superficieMasAlta, Modifier.weight(1f)) {
                                                 onBorrarPerfil(r.perfil.id)
                                             }
                                         }
@@ -540,8 +539,7 @@ fun PantallaPrincipal(
                         } else {
                             items(halladosCatalogo) { d ->
                                 val p = Datos.perfilDeDispositivo(d)
-                                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(14.dp)).padding(13.dp)) {
+                                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Cristal.superficie).padding(13.dp)) {
                                     Text(d.legible, fontSize = 13.sp, color = Cristal.texto,
                                         fontWeight = FontWeight.Medium)
                                     Text(
@@ -555,7 +553,7 @@ fun PantallaPrincipal(
                                             Boton("Usar", Cristal.marca, Modifier.weight(1f)) {
                                                 onSeleccionarPerfil(p)
                                             }
-                                            Boton("Guardar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                            Boton("Guardar", Cristal.superficieMasAlta, Modifier.weight(1f)) {
                                                 onGuardarPerfil(p)
                                             }
                                         }
@@ -594,8 +592,7 @@ fun PantallaPrincipal(
                             } else {
                                 items(halladas) { f ->
                                     val perfil = Datos.perfilDeFicha(f)
-                                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(14.dp)).padding(13.dp)) {
+                                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Cristal.superficie).padding(13.dp)) {
                                         Text(f.nombre, fontSize = 13.sp, color = Cristal.texto,
                                             fontWeight = FontWeight.Medium)
                                         Text(f.resumen, fontSize = 10.sp, lineHeight = 15.sp,
@@ -614,7 +611,7 @@ fun PantallaPrincipal(
                                                 Boton("Usar", Cristal.marca, Modifier.weight(1f)) {
                                                     onSeleccionarPerfil(perfil)
                                                 }
-                                                Boton("Guardar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                                Boton("Guardar", Cristal.superficieMasAlta, Modifier.weight(1f)) {
                                                     onGuardarPerfil(perfil)
                                                 }
                                             }
@@ -636,8 +633,7 @@ fun PantallaPrincipal(
                             )
                         }
                         items(Datos.buscarSoc(socs, consultaSoc, 15)) { s ->
-                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(14.dp)).padding(12.dp)) {
+                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Cristal.superficie).padding(12.dp)) {
                                 Row(
                                     Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -670,8 +666,7 @@ fun PantallaPrincipal(
                                 Cristal.ambar,
                             )
                         } else {
-                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(16.dp)).padding(14.dp)) {
+                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Cristal.superficie).padding(14.dp)) {
                                 Text(datosSonda.resumen, fontSize = 12.sp, color = Cristal.texto,
                                     fontWeight = FontWeight.Medium)
                                 if (!datosSonda.completa) {
@@ -687,7 +682,7 @@ fun PantallaPrincipal(
                     }
                     item {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Boton("Volver a leer el teléfono", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                            Boton("Volver a leer el teléfono", Cristal.superficieMasAlta, Modifier.weight(1f)) {
                                 onSondar()
                             }
                             Boton("Generar todos", Cristal.verde, Modifier.weight(1f)) {
@@ -698,8 +693,7 @@ fun PantallaPrincipal(
                         }
                     }
                     items(candidatos) { c ->
-                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(16.dp)).padding(14.dp)) {
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Cristal.superficie).padding(14.dp)) {
                             Row(
                                 Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -733,7 +727,7 @@ fun PantallaPrincipal(
                                     onGuardarPerfil(c.generado.perfil)
                                     onSeleccionarPerfil(c.generado.perfil)
                                 }
-                                Boton("Usar sin guardar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                Boton("Usar sin guardar", Cristal.superficieMasAlta, Modifier.weight(1f)) {
                                     onSeleccionarPerfil(c.generado.perfil)
                                 }
                             }
@@ -766,8 +760,7 @@ fun PantallaPrincipal(
                     }
                     extraido?.let { e ->
                         item {
-                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(16.dp)).padding(14.dp)) {
+                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Cristal.superficie).padding(14.dp)) {
                                 Text(e.resumen, fontSize = 13.sp, color = Cristal.texto,
                                     fontWeight = FontWeight.Medium)
                                 Spacer(Modifier.height(6.dp))
@@ -818,8 +811,7 @@ fun PantallaPrincipal(
                         }
                     } else {
                         items(biblioteca) { p ->
-                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(14.dp)).padding(13.dp)) {
+                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Cristal.superficie).padding(13.dp)) {
                                 Text(p.nombre, fontSize = 13.sp, color = Cristal.texto,
                                     fontWeight = FontWeight.Medium)
                                 Text(p.fuente, fontSize = 10.sp, lineHeight = 15.sp,
@@ -829,7 +821,7 @@ fun PantallaPrincipal(
                                     Boton("Usar", Cristal.marca, Modifier.weight(1f)) {
                                         onSeleccionarPerfil(p)
                                     }
-                                    Boton("Borrar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                    Boton("Borrar", Cristal.superficieMasAlta, Modifier.weight(1f)) {
                                         onBorrarPerfil(p.id)
                                     }
                                 }
@@ -915,8 +907,7 @@ fun PantallaPrincipal(
                     }
                     item { Etiqueta("LO QUE NECESITA ROOT (Y AQUÍ NO ESTÁ)") }
                     items(sinRootRendimiento) { (que, porQue) ->
-                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(12.dp)).padding(12.dp)) {
+                        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Cristal.superficie).padding(12.dp)) {
                             Text(que, fontSize = 12.sp, color = Cristal.texto,
                                 fontWeight = FontWeight.Medium)
                             Text(porQue, fontSize = 10.sp, lineHeight = 15.sp,
@@ -970,7 +961,7 @@ fun PantallaPrincipal(
                     item {
                         Column(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .background(Cristal.vidrio).padding(14.dp),
+                                .background(Cristal.superficie).padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             datosEquipo.forEach { (k, v) ->
@@ -1004,7 +995,7 @@ fun PantallaPrincipal(
                         }
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                                .background(Cristal.vidrio).padding(12.dp),
+                                .background(Cristal.superficie).padding(12.dp),
                         ) {
                             icono()
                             Spacer(Modifier.width(10.dp))
@@ -1044,7 +1035,7 @@ fun PantallaPrincipal(
                             Seguridad.resumenListas().forEach { (titulo, lista) ->
                                 Column(
                                     Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                                        .background(Cristal.vidrio).padding(12.dp),
+                                        .background(Cristal.superficie).padding(12.dp),
                                 ) {
                                     Text(titulo, fontSize = 10.sp, letterSpacing = 0.8.sp,
                                         color = Cristal.textoSuave, fontWeight = FontWeight.Bold)
@@ -1059,8 +1050,7 @@ fun PantallaPrincipal(
                     item {
                         Column(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                .background(Cristal.vidrio)
-                                .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(12.dp)).padding(14.dp),
+                                .background(Cristal.superficie).padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             limites.forEach {
@@ -1108,8 +1098,7 @@ private fun BarraEstado(estado: Director.Estado, descripcion: String) {
         Director.Estado.SIN_VIA -> Cristal.rojo to "SIN VÍA"
     }
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Cristal.vidrio)
-            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(12.dp)).padding(14.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Cristal.superficie).padding(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(8.dp).clip(RoundedCornerShape(4.dp)).background(color))
@@ -1130,8 +1119,7 @@ internal fun Etiqueta(t: String) {
 private fun Aviso(texto: String, color: Color) {
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-            .background(color.copy(alpha = 0.10f))
-            .border(1.dp, color.copy(alpha = 0.30f), RoundedCornerShape(10.dp)).padding(12.dp),
+            .background(color.copy(alpha = 0.10f)).padding(12.dp),
     ) {
         Text(texto, fontSize = 12.sp, lineHeight = 17.sp, color = color.copy(alpha = 0.95f))
     }
@@ -1143,8 +1131,7 @@ private fun TablaActual(actual: Map<String, String>) = TablaFiltrada(actual, act
 @Composable
 private fun TablaFiltrada(actual: Map<String, String>, claves: List<String>) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Cristal.vidrio)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(12.dp)).padding(14.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Cristal.superficie).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         if (actual.isEmpty()) {
@@ -1228,7 +1215,7 @@ private fun FilaDiag(l: Diagnostico.Linea) {
         Diagnostico.Linea.Estado.MAL -> Cristal.rojo
     }
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Cristal.vidrio)
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Cristal.superficieAlta)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1296,7 +1283,6 @@ private fun BarraModo(modo: Modo, onModo: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
             .background(color.copy(alpha = 0.10f))
-            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1330,13 +1316,20 @@ private fun BarraModo(modo: Modo, onModo: () -> Unit) {
 
 @Composable
 private fun TarjetaSuper(s: Supercomputadora, activa: Boolean, onSimular: () -> Unit) {
-    val borde = if (activa) Cristal.rojo else Cristal.bordeLuz
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(if (activa) Cristal.vidrioFuerte else Cristal.vidrio)
-            .border(if (activa) 1.5.dp else 1.dp, borde, RoundedCornerShape(12.dp))
-            .clickable { onSimular() }.padding(14.dp),
+    // Seleccionada = barra a la izquierda y tono más alto. Sin borde: el borde era el adorno
+    // que hacía que doce tarjetas seguidas pareciesen doce cromos.
+    Row(
+        Modifier.fillMaxWidth()
+            .background(if (activa) Cristal.superficieAlta else Color.Transparent)
+            .clickable { onSimular() }.padding(vertical = 12.dp, horizontal = 12.dp),
+        verticalAlignment = Alignment.Top,
     ) {
+        Box(
+            Modifier.width(3.dp).height(38.dp).clip(RoundedCornerShape(2.dp))
+                .background(if (activa) Cristal.rojo else Cristal.bordeLuz),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
@@ -1362,6 +1355,7 @@ private fun TarjetaSuper(s: Supercomputadora, activa: Boolean, onSimular: () -> 
             "→ el teléfono declarará llamarse «${s.nombre}»",
             fontSize = 11.sp, color = Cristal.textoSuave, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
         )
+        }
     }
 }
 
@@ -1375,8 +1369,7 @@ private fun FilaAppAccion(
     onLimpiar: () -> Unit,
     onPanel: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(16.dp)).padding(13.dp)) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Cristal.superficie).padding(13.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -1394,9 +1387,9 @@ private fun FilaAppAccion(
             if (congelada) {
                 Boton("Activar", Cristal.verde, Modifier.weight(1f)) { onDescongelar() }
             } else {
-                Boton("Congelar", Cristal.vidrioFuerte, Modifier.weight(1f)) { onCongelar() }
+                Boton("Congelar", Cristal.superficieMasAlta, Modifier.weight(1f)) { onCongelar() }
             }
-            Boton("Caché", Cristal.vidrioFuerte, Modifier.weight(1f)) { onLimpiar() }
+            Boton("Caché", Cristal.superficieMasAlta, Modifier.weight(1f)) { onLimpiar() }
             Boton(
                 if (hechos > 0) "Panel · $hechos" else "Panel",
                 Cristal.marca, Modifier.weight(1f),
@@ -1408,8 +1401,7 @@ private fun FilaAppAccion(
 @Composable
 private fun FilaFicha(f: Ficha, onPanel: () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(18.dp)).clickable { onPanel() }.padding(15.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Cristal.superficie).clickable { onPanel() }.padding(15.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically) {
@@ -1458,7 +1450,6 @@ private fun CampoTexto(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(14.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
         decorationBox = { interior ->
             if (valor.isEmpty()) {
@@ -1484,8 +1475,7 @@ private fun Fila(clave: String, valor: String) {
 /** Una posición del TOP500, de una edición concreta. Dato real, no simulado. */
 @Composable
 private fun FilaSistemaTop(s: Datos.Sistema) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(12.dp)).padding(11.dp)) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Cristal.superficie).padding(11.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 "${s.rank}",
@@ -1532,8 +1522,7 @@ private fun TarjetaRendimiento(
         Rendimiento.Riesgo.MEDIO -> Cristal.ambar
         Rendimiento.Riesgo.ALTO -> Cristal.rojo
     }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(16.dp)).padding(14.dp)) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Cristal.superficie).padding(14.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
                 a.nombre, fontSize = 14.sp, color = Cristal.texto,
@@ -1589,8 +1578,7 @@ fun PantallaArrancando(error: String? = null) {
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            Modifier.padding(36.dp).clip(RoundedCornerShape(26.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(26.dp)).padding(26.dp),
+            Modifier.padding(36.dp).clip(RoundedCornerShape(26.dp)).background(Cristal.superficie).padding(26.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(

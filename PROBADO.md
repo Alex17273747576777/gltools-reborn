@@ -3,6 +3,33 @@
 Máquina de compilación: JDK 21.0.13 · Gradle 8.11.1 · Android SDK platform 35 ·
 build-tools 35.0.0.
 
+## 1.9.2 · el resto de las pantallas, y un agujero en la ley
+
+La 1.9.1 dejó la portada bien y **las otras cuatro secciones como estaban**. Medido:
+
+| Antes | Después |
+|---|---|
+| `Pantalla.kt`: **21 bordes**, **30 usos de vidrio**, 43 cajas redondeadas | **0 bordes**, **0 vidrio**, y las cajas se cuentan abajo |
+| `Configurar.kt`, `Superposicion.kt`, `PantallaFallo.kt`: 8 bordes y 15 vidrios más | 1 borde (el aro de un selector de color, que **es** el dato) |
+
+| Qué | Cómo | Resultado |
+|---|---|---|
+| Existe un único sitio donde se dibuja una caja | `pruebasNucleo` | `Grupo.kt`: `Grupo`, `Fila`, `Hilo`, `Dato`, `Estado`, `FilaEnlace`, `AvisoSeccion` |
+| Ninguna pantalla usa un color llamado «vidrio» | idem, contando `Cristal.vidrio` en las 6 pantallas | **0** (antes **45**) |
+| Las pantallas no dibujan bordes de adorno | idem | **≤2** (antes 10) |
+| Menos de 40 cajas redondeadas en toda la interfaz | idem | **39** (antes 49) |
+| **La ley falla cuando debe** | meter los 45 vidrios a propósito antes de limpiarlos | **falló**, señalando 45 usos, 10 bordes y 49 cajas; limpiado, verde |
+| Suite completa | `gradle :app:pruebasNucleo` | **355 comprobaciones, 0 fallos** |
+
+**El agujero, contado:** la regla de la 1.8.1 buscaba `.vidrio(` —la función— y
+`Brush.linearGradient(`. En la 1.9.1 había **28 usos de `Cristal.vidrio`**, que es el *color*,
+no la función: no contaban. La ley daba verde con 30 cajas de vidrio en pantalla. Una regla que
+se esquiva cambiando de nombre no es una regla; ahora cuenta el nombre y el efecto.
+
+**Lo que NO está probado en 1.9.2:** el aspecto de las cuatro secciones rehechas **no se ha
+visto en una pantalla**. Lo que sí está medido es que las cajas, los bordes y el vidrio han
+bajado, y que las pruebas lo vigilan.
+
 ## 1.9.1 · tipografía propia, censo completo y procedimientos
 
 | Qué | Cómo | Resultado |

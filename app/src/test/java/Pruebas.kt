@@ -1394,6 +1394,38 @@ run {
         }
     }
 
+
+    // ── 1.9.2: la ley tenía un agujero y las cajas se colaron por él ──
+    //
+    // Lo que pasó: la regla contaba `.vidrio(` (la función) y `Brush.linearGradient(`. En la
+    // 1.9.1 había 28 usos de `Cristal.vidrio` —el COLOR— que no eran función y por tanto no
+    // contaban. La ley daba verde con 30 cajas de vidrio en la pantalla. Una regla que se puede
+    // esquivar cambiando de nombre no es una regla.
+    println()
+    println("── la superficie, medida de verdad ──")
+    if (uiDir != null) {
+        val fuentes3 = uiDir.listFiles { f -> f.extension == "kt" }!!.sortedBy { it.name }
+        fun cuenta(re: String, saltar: Set<String> = setOf("Tema.kt", "Grupo.kt")) =
+            fuentes3.filter { it.name !in saltar }
+                .sumOf { f -> Regex(re).findAll(f.readText()).count() }
+
+        // Un color de superficie se llama por su nivel, no por cómo se ve.
+        val vidrios = cuenta("Cristal\\.vidrio")
+        check("ninguna pantalla usa un color llamado «vidrio»", vidrios == 0, "$vidrios usos")
+
+        // Ni cajas dentro de cajas: los bordes de adorno, prohibidos en las pantallas.
+        val bordes = cuenta("\\s\\.border\\(")
+        check("las pantallas no dibujan bordes de adorno", bordes <= 2, "$bordes bordes")
+
+        // El número de cajas redondeadas no puede crecer: es la medida de «esto parece una web».
+        val cajas = cuenta("RoundedCornerShape\\(1[2-9]\\.[0-9]?dp|RoundedCornerShape\\(2[0-9]\\.[0-9]?dp")
+        check("hay menos de 40 cajas redondeadas en toda la interfaz", cajas < 40, "$cajas cajas")
+
+        // Un solo sitio donde se dibuja la caja: el componente Grupo.
+        check("el componente de grupo existe y es el único que dibuja cajas",
+            java.io.File(uiDir, "Grupo.kt").exists())
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

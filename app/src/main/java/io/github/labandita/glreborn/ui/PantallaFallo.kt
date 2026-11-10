@@ -43,8 +43,7 @@ fun PantallaFallo(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
-                    .background(Cristal.rojo.copy(alpha = 0.18f))
-                    .border(1.dp, Cristal.rojo.copy(alpha = 0.45f), RoundedCornerShape(14.dp)),
+                    .background(Cristal.rojo.copy(alpha = 0.18f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Iconos.Aspa(tamano = 20.dp, color = Cristal.rojo)
@@ -73,8 +72,7 @@ fun PantallaFallo(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(Cristal.vidrio)
-                .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(16.dp))
+                .background(Cristal.superficie)
                 .padding(14.dp),
         ) {
             Text(
@@ -98,7 +96,7 @@ fun PantallaFallo(
             }
             Box(
                 Modifier.weight(1f).clip(RoundedCornerShape(15.dp))
-                    .background(Cristal.vidrioFuerte).clickable { onContinuar() }
+                    .background(Cristal.superficieMasAlta).clickable { onContinuar() }
                     .padding(vertical = 14.dp),
                 contentAlignment = Alignment.Center,
             ) {

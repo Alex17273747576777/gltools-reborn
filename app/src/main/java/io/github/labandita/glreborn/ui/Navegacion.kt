@@ -164,7 +164,6 @@ fun ChipModo(modo: io.github.labandita.glreborn.core.Modo, onModo: () -> Unit, m
         modifier
             .clip(RoundedCornerShape(20.dp))
             .background(color.copy(alpha = 0.16f))
-            .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
             .clickable { onModo() }
             .padding(horizontal = 11.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -56,7 +56,7 @@ fun PantallaConfigurar(
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(Cristal.vidrio)
+                .background(Cristal.superficie)
                 .padding(3.dp),
         ) {
             listOf("GENERAL", "OPENGL", "VULKAN", "IMAGEN").forEach { tab ->
@@ -65,7 +65,7 @@ fun PantallaConfigurar(
                     Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(11.dp))
-                        .background(if (activa) Cristal.vidrioFuerte else Cristal.vidrio.copy(alpha = 0f))
+                        .background(if (activa) Cristal.superficieMasAlta else Cristal.superficie.copy(alpha = 0f))
                         .clickable { grupo = tab }
                         .padding(vertical = 10.dp),
                     contentAlignment = Alignment.Center,
@@ -82,7 +82,7 @@ fun PantallaConfigurar(
                                 .width(18.dp)
                                 .height(2.dp)
                                 .clip(RoundedCornerShape(1.dp))
-                                .background(if (activa) Cristal.cian else Cristal.vidrio.copy(alpha = 0f)),
+                                .background(if (activa) Cristal.cian else Cristal.superficie.copy(alpha = 0f)),
                         )
                     }
                 }
@@ -102,8 +102,7 @@ fun PantallaConfigurar(
             if (visibles.isEmpty()) {
                 run {
                     Column(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Cristal.superficie)
-            .border(1.dp, Cristal.bordeLuz, RoundedCornerShape(18.dp)).padding(20.dp),
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Cristal.superficie).padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text("Nada que configurar aquí", fontSize = 14.sp, color = Cristal.texto,
@@ -147,7 +146,7 @@ private fun FilaOpcion(f: FilaConfig, onAlternar: (String) -> Unit) {
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Cristal.vidrio)
+            .background(Cristal.superficie)
             .clickable(enabled = f.disponible) { onAlternar(f.id) }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -188,7 +187,6 @@ private fun EtiquetaConsecuencia(e: FilaConfig.Etiqueta) {
     Box(
         Modifier
             .clip(RoundedCornerShape(20.dp))
-            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
             .padding(horizontal = 7.dp, vertical = 2.dp),
     ) {
         Text(texto, fontSize = 8.sp, color = color, fontWeight = FontWeight.Medium)
@@ -207,7 +205,7 @@ private fun Casilla(marcada: Boolean, habilitada: Boolean) {
         Modifier
             .size(22.dp)
             .clip(RoundedCornerShape(7.dp))
-            .background(if (marcada && habilitada) color.copy(alpha = 0.22f) else Cristal.vidrio.copy(alpha = 0f))
+            .background(if (marcada && habilitada) color.copy(alpha = 0.22f) else Cristal.superficie.copy(alpha = 0f))
             .border(1.4.dp, color, RoundedCornerShape(7.dp)),
         contentAlignment = Alignment.Center,
     ) {
@@ -240,13 +238,13 @@ private fun TarjetaPlantilla(
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BotonPlano("Buscar una", Cristal.marca, Modifier.weight(1f)) { onIrAPerfiles() }
-                BotonPlano("Generar", Cristal.vidrioFuerte, Modifier.weight(1f)) { onIrAGenerar() }
+                BotonPlano("Generar", Cristal.superficieMasAlta, Modifier.weight(1f)) { onIrAGenerar() }
             }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier.size(38.dp).clip(RoundedCornerShape(12.dp))
-                        .background(Cristal.vidrioFuerte),
+                        .background(Cristal.superficieMasAlta),
                     contentAlignment = Alignment.Center,
                 ) { Iconos.Espadas(tamano = 19.dp, color = Cristal.cian) }
                 Spacer(Modifier.width(12.dp))
@@ -274,8 +272,8 @@ private fun TarjetaPlantilla(
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BotonPlano("Cambiar", Cristal.vidrioFuerte, Modifier.weight(1f)) { onIrAPerfiles() }
-                BotonPlano("Generar otro", Cristal.vidrioFuerte, Modifier.weight(1f)) { onIrAGenerar() }
+                BotonPlano("Cambiar", Cristal.superficieMasAlta, Modifier.weight(1f)) { onIrAPerfiles() }
+                BotonPlano("Generar otro", Cristal.superficieMasAlta, Modifier.weight(1f)) { onIrAGenerar() }
             }
         }
     }
