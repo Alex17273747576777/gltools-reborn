@@ -1055,15 +1055,14 @@ run {
     // ══════════════════════════════════════════════════════════════════════════
     println()
     println("── las dos variantes de APK ──")
-    val normal = listOf(
-        "apk/GLTools-Reborn-1.7.1.apk", "apk/GLTools-Reborn-1.7.0.apk",
-        "../apk/GLTools-Reborn-1.7.1.apk",
-    ).map { java.io.File(it) }.firstOrNull { it.exists() }
-    val crudo = listOf(
-        "apk/GLTools-Reborn-1.7.1-sin-comprimir.apk",
-        "apk/GLTools-Reborn-1.7.0-sin-comprimir.apk",
-        "../apk/GLTools-Reborn-1.7.1-sin-comprimir.apk",
-    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    // Se buscan por patrón, no por número de versión: si se fija el nombre, la prueba deja
+    // de comprobar nada en cuanto sube la versión, y ese silencio es peor que un fallo.
+    val carpetaApk = listOf(java.io.File("apk"), java.io.File("../apk"))
+        .firstOrNull { it.isDirectory }
+    val apks = carpetaApk?.listFiles { f -> f.extension == "apk" }?.sortedBy { it.name }
+        ?: emptyList()
+    val normal = apks.filterNot { it.name.contains("sin-comprimir") }.lastOrNull()
+    val crudo = apks.firstOrNull { it.name.contains("sin-comprimir") }
     if (normal != null && crudo != null) {
         val r = crudo.length().toDouble() / normal.length()
         check(
