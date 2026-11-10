@@ -15,6 +15,30 @@ import io.github.labandita.glreborn.shizuku.Shell
  */
 class Compatibilidad(private val shell: Shell) {
 
+    companion object {
+        /** Propiedad de la prueba de escritura: de las que la vía ADB sí puede tocar. */
+        const val CLAVE_PRUEBA = "debug.reborn.prueba"
+        /** Propiedad que sólo root puede escribir. Sólo se prueba cuando la vía es root. */
+        const val CLAVE_PROTEGIDA = "persist.reborn.prueba"
+        /** Prefijos que el dominio `shell` puede escribir (AOSP, system/sepolicy). */
+        val PREFIJOS_SIN_ROOT = listOf("debug.", "persist.debug.", "log.tag.", "persist.log.tag.")
+        /** La única pregunta que Android contesta sobre el modo fijo: su código de salida. */
+        const val SONDA_MODO_FIJO = "cmd power set-fixed-performance-mode-enabled false"
+
+        /**
+         * ¿Puede la vía ADB —Shizuku sin root: dominio SELinux `shell`, uid 2000— escribir esta
+         * propiedad?
+         *
+         * No es una suposición: sale de `system/sepolicy` de AOSP (Android 14). `private/shell.te`
+         * da a `shell` permiso sobre `debug_prop`, `persist_debug_prop` y `log_tag_prop`, y
+         * `private/property_contexts` asigna esos tipos a los prefijos de abajo. Todo lo que no
+         * casa con ningún prefijo —`persist.reborn.prueba`, por ejemplo— cae en `default_prop`,
+         * que `shell` NO puede escribir. Por eso la prueba antigua fallaba en todos los teléfonos
+         * sin root con «Failed to set property … See dmesg»: pedía algo que Android prohíbe.
+         */
+        fun escribibleSinRoot(clave: String): Boolean = PREFIJOS_SIN_ROOT.any { clave.startsWith(it) }
+    }
+
     data class Prueba(
         val nombre: String,
         val resultado: Estado,
@@ -118,19 +142,18 @@ class Compatibilidad(private val shell: Shell) {
             // así que «Restaurar» no sabía que tenía que devolverlo. Una prueba que deja basura
             // es peor que no probar.
             pruebas += probarEscritura()
+            pruebas += probarProtegidas()
             pruebas += probar("Resolución (wm)", "wm size")
             pruebas += probar("Densidad (wm)", "wm density")
             pruebas += probar("Lista de apps (pm)", "pm list packages -3")
             pruebas += probar("Ajustes del sistema (settings)", "settings get global private_dns_mode")
             pruebas += probar("Congelar apps (pm disable)", "pm list packages -d")
-            // `get-fixed-performance-mode-supported` NO EXISTE: `cmd power` en Android 13 sólo
-            // tiene `set-mode`, `set-fixed-performance-mode-enabled` y `help`. De ahí el 255.
-            // Lo que sí se puede saber sin inventar nada: si el servicio de energía responde y
-            // si el sistema admite el modo fijo.
+            // Cómo se prueba y por qué, en `juzgarModoFijo`.
             pruebas += probarModoRendimiento()
         } else {
             val motivo = "Se salta: sin shell no se puede probar"
-            for (n in listOf("Lectura de propiedades", "Escribir y deshacer una propiedad", "Resolución (wm)",
+            for (n in listOf("Lectura de propiedades", "Escribir y deshacer una propiedad",
+                "Propiedades protegidas (persist.*, ro.*)", "Resolución (wm)",
                 "Densidad (wm)", "Lista de apps (pm)", "Ajustes del sistema (settings)",
                 "Congelar apps (pm disable)", "Modo rendimiento (cmd)")) {
                 pruebas += Prueba(n, Prueba.Estado.NO_APLICA, motivo)
@@ -140,62 +163,118 @@ class Compatibilidad(private val shell: Shell) {
         return pruebas
     }
 
+    // ── Las dos pruebas que mentían (corregidas el 2026-11-10) ─────────────────────────────
+    //
+    // La lógica es pura a propósito, como `esHuaweiDe`: recibe lo que contestó el teléfono y
+    // decide. Así se prueba sin un teléfono delante, que es donde se equivocaba.
+
+    /** `id -u` devuelve 0 sólo cuando la vía es root (Shizuku arrancado con root, o Sui). */
+    fun esRootDe(salidaIdU: String?): Boolean = salidaIdU?.trim() == "0"
+
+    /** Decide la prueba de escritura a partir de lo que contestó el teléfono. */
+    fun juzgarEscritura(
+        nombre: String,
+        clave: String,
+        codigo: Int?,
+        motivo: String,
+        leido: String,
+    ): Prueba = when {
+        codigo == null -> Prueba(nombre, Prueba.Estado.FALLA, "sin respuesta del gestor")
+        leido == "1" -> Prueba(nombre, Prueba.Estado.PASA,
+            "se escribió `$clave`, se leyó y se devolvió a como estaba. No queda nada cambiado.")
+        motivo.contains("Failed to set property") -> Prueba(nombre, Prueba.Estado.FALLA,
+            "Android rechazó escribir `$clave`. Es una propiedad que esta vía debería poder " +
+                "tocar, así que el bloqueo lo pone el fabricante: los perfiles que escriben " +
+                "propiedades no funcionarán aquí. Contestó: ${motivo.take(120)}")
+        leido.isEmpty() -> Prueba(nombre, Prueba.Estado.FALLA,
+            "el comando no dio error, pero `$clave` no cambió: ${motivo.take(120)}")
+        else -> Prueba(nombre, Prueba.Estado.FALLA,
+            "se pidió escribir 1 en `$clave` y al leer salió «${leido.take(30)}»")
+    }
+
     /**
-     * Prueba de escritura **que se deshace**.
+     * Decide la prueba del modo rendimiento a partir de lo que contestó
+     * `cmd power set-fixed-performance-mode-enabled`.
      *
-     * Se lee el valor anterior, se escribe, se comprueba y se devuelve el anterior. Así la prueba
-     * contesta la pregunta de verdad («¿puede esta app escribir propiedades con su vía actual?»)
-     * sin dejar el teléfono cambiado si sale mal a la mitad.
+     * Leído en `PowerManagerShellCommand.java` de AOSP: esa orden existe desde Android 11
+     * (API 30) y devuelve 0 **sólo si el HAL de energía aceptó el modo**; si no, -1 (255 en
+     * la shell) con «Failed to set FIXED_PERFORMANCE mode». Ese código es la única respuesta
+     * que da Android: no hay consulta de «¿está soportado?» ni ajuste que leer después.
+     *
+     * Dos errores de la prueba anterior, los dos visibles en el mismo teléfono:
+     *  · preguntaba `cmd power help` y exigía código 0, pero `help` devuelve -1 **siempre**
+     *    (`handleDefaultCommands` imprime la ayuda y sale con -1). Resultado: «el servicio de
+     *    energía no responde» pegado a la ayuda que el servicio acababa de responder;
+     *  · después leía el ajuste `power_fixed_performance_mode_enabled`, que no existe en
+     *    ninguna versión de Android: aunque lo anterior hubiera pasado, esto no podía pasar.
      */
-    private fun probarEscritura(): Prueba {
-        val clave = "persist.reborn.prueba"
-        val antes = shell.correr("getprop $clave")?.texto?.trim().orEmpty()
-        val escribio = shell.correr("setprop $clave 1")
-        if (escribio == null) {
-            return Prueba("Escribir y deshacer una propiedad", Prueba.Estado.FALLA,
-                "sin respuesta del gestor")
-        }
-        val leido = shell.correr("getprop $clave")?.texto?.trim().orEmpty()
-        // Se deshace SIEMPRE, antes de devolver el resultado.
-        shell.correr("setprop $clave '${antes.ifBlank { "" }}'")
+    fun juzgarModoFijo(sdk: Int, codigo: Int?, texto: String): Prueba {
+        val nombre = "Modo rendimiento (cmd)"
         return when {
-            leido == "1" && antes.isBlank() -> Prueba(
-                "Escribir y deshacer una propiedad", Prueba.Estado.PASA,
-                "se escribió, se leyó y se borró. No queda nada cambiado.",
-            )
-            leido.isEmpty() -> Prueba(
-                "Escribir y deshacer una propiedad", Prueba.Estado.FALLA,
-                "sonó bien pero no cambió: ${escribio.motivo}",
-            )
-            else -> Prueba(
-                "Escribir y deshacer una propiedad", Prueba.Estado.FALLA,
-                "se escribió lo que dice el código, no 1 (${leido.take(30)})",
-            )
+            sdk < 30 -> Prueba(nombre, Prueba.Estado.NO_APLICA,
+                "el modo de rendimiento fijo existe desde Android 11 (API 30); este teléfono es API $sdk")
+            codigo == null -> Prueba(nombre, Prueba.Estado.FALLA, "sin respuesta del gestor")
+            codigo == 0 -> Prueba(nombre, Prueba.Estado.PASA,
+                "el servicio de energía aceptó la orden: este teléfono admite el modo fijo. " +
+                    "(Se probó pidiendo «apagado»: si lo tenías encendido, vuelve a encenderlo.)")
+            texto.contains("FIXED_PERFORMANCE") || texto.contains("Power HAL") ->
+                Prueba(nombre, Prueba.Estado.FALLA,
+                    "el servicio de energía responde, pero este teléfono no implementa el modo " +
+                        "fijo (el fabricante no lo conectó al HAL de energía). El interruptor " +
+                        "no hará nada aquí.")
+            texto.contains("Unknown command") -> Prueba(nombre, Prueba.Estado.FALLA,
+                "este Android no tiene la orden del modo fijo: `cmd power` contestó «Unknown command»")
+            else -> Prueba(nombre, Prueba.Estado.FALLA,
+                "código $codigo: ${texto.lineSequence().firstOrNull().orEmpty().take(120).ifBlank { "sin detalle" }}")
         }
     }
 
     /**
-     * Modo rendimiento, **sin inventar comandos**.
+     * Prueba de escritura **que se deshace**.
      *
-     * Android no tiene una consulta de «¿está soportado?». Lo que se puede hacer, y se hace:
-     * preguntar a `cmd power` si responde (código 0 con su ayuda) y probar el encendido leyendo
-     * el ajuste que deja (`power_fixed_performance_mode_enabled`). Si el sistema no lo admite,
-     * `settings` lo dirá.
+     * Se lee el valor anterior, se escribe, se comprueba y se devuelve el anterior. La clave es
+     * `debug.reborn.prueba` porque es de las que la vía ADB sí puede escribir (ver
+     * `escribibleSinRoot`) y porque las `debug.*` no se guardan: desaparece al reiniciar.
+     */
+    private fun probarEscritura(): Prueba =
+        escribirYDeshacer("Escribir y deshacer una propiedad", CLAVE_PRUEBA)
+
+    /**
+     * Lo que la prueba de arriba NO contesta: las propiedades que no son `debug.*`.
+     *
+     * Sin root no se intenta: Android lo prohíbe y el resultado se sabe de antemano. Decirlo
+     * así es más útil que un «Failed to set property» sin contexto. Con root sí se prueba.
+     */
+    private fun probarProtegidas(): Prueba {
+        val nombre = "Propiedades protegidas (persist.*, ro.*)"
+        val uid = shell.correr("id -u")?.texto?.trim()
+        if (!esRootDe(uid)) {
+            return Prueba(nombre, Prueba.Estado.NO_APLICA,
+                "la vía actual es ADB (uid ${uid?.take(8).orEmpty().ifBlank { "?" }}), no root. " +
+                    "Android sólo deja a esa vía escribir debug.* y persist.debug.*; el resto lo " +
+                    "reserva al sistema y a root. Los perfiles que cambian esas propiedades " +
+                    "necesitan root: no es un fallo de tu teléfono.")
+        }
+        return escribirYDeshacer(nombre, CLAVE_PROTEGIDA)
+    }
+
+    private fun escribirYDeshacer(nombre: String, clave: String): Prueba {
+        val antes = shell.correr("getprop $clave")?.texto?.trim().orEmpty()
+        val escribio = shell.correr("setprop $clave 1")
+        val leido = shell.correr("getprop $clave")?.texto?.trim().orEmpty()
+        // Se deshace SIEMPRE, antes de devolver el resultado.
+        if (escribio != null) shell.correr("setprop $clave '$antes'")
+        return juzgarEscritura(nombre, clave, escribio?.codigo, escribio?.motivo.orEmpty(), leido)
+    }
+
+    /**
+     * Modo rendimiento: se pide «apagado» y se mira el código. Pedir «apagado» pregunta lo
+     * mismo que pedir «encendido» (¿acepta el HAL este modo?) sin calentar el teléfono.
      */
     private fun probarModoRendimiento(): Prueba {
-        val responde = shell.correr("cmd power help")
-        if (responde == null || responde.codigo != 0) {
-            return Prueba("Modo rendimiento (cmd)", Prueba.Estado.FALLA,
-                "el servicio de energía no responde a `cmd power`: " +
-                    "${responde?.motivo ?: "sin respuesta"}")
-        }
-        val ajuste = shell.correr("settings get global power_fixed_performance_mode_enabled")
-        val hayAjuste = ajuste != null && ajuste.codigo == 0 &&
-            ajuste.texto.trim() in listOf("0", "1")
-        return if (hayAjuste) Prueba("Modo rendimiento (cmd)", Prueba.Estado.PASA,
-            "el sistema expone el modo fijo (ahora en ${ajuste!!.texto.trim()})")
-        else Prueba("Modo rendimiento (cmd)", Prueba.Estado.FALLA,
-            "el servicio responde pero este sistema no expone el modo fijo de rendimiento")
+        if (Build.VERSION.SDK_INT < 30) return juzgarModoFijo(Build.VERSION.SDK_INT, null, "")
+        val r = shell.correr(SONDA_MODO_FIJO)
+        return juzgarModoFijo(Build.VERSION.SDK_INT, r?.codigo, r?.texto.orEmpty())
     }
 
     private fun probar(nombre: String, comando: String): Prueba {

@@ -54,8 +54,14 @@ object ReglasPenetracion {
         Triple("Congelar apps (pm disable-user)", "pm list packages -d", null),
         Triple("Leer ajustes globales", "settings get global device_provisioned", null),
         Triple("Escribir ajustes globales", "settings put global reborn_prueba 1 && settings get global reborn_prueba", "1"),
-        Triple("Modo rendimiento fijo", "settings get global power_fixed_performance_mode_enabled", null),
-        Triple("Escritura de propiedades", "setprop persist.reborn.prueba 1 && getprop persist.reborn.prueba", "1"),
+        // El código de salida es lo único que Android contesta sobre el modo fijo (0 = el HAL lo
+        // acepta). El ajuste que se leía antes no existe en ninguna versión.
+        Triple("Modo rendimiento fijo", Compatibilidad.SONDA_MODO_FIJO + " >/dev/null 2>&1; echo \$?", "0"),
+        // `debug.*` es lo que la vía ADB puede escribir; `persist.reborn.*` lo prohíbe SELinux
+        // en todo teléfono sin root. Se lee y se deja vacía en el mismo comando.
+        Triple("Escritura de propiedades (debug.*)",
+            "setprop ${Compatibilidad.CLAVE_PRUEBA} 1 && getprop ${Compatibilidad.CLAVE_PRUEBA}; " +
+                "setprop ${Compatibilidad.CLAVE_PRUEBA} ''", "1"),
         Triple("Leer dumpsys", "dumpsys -l", null),
         Triple("Modo root disponible", "su -c id", null),
     )

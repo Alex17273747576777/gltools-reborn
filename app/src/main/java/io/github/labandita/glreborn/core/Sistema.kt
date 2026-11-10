@@ -91,54 +91,47 @@ class Sistema(private val shell: Shell, private val aplicado: Aplicado? = null) 
     /**
      * Modo rendimiento del sistema. Sin root sólo se puede pedir; el sistema decide.
      *
-     * Lo que estaba mal: se comprobaba el resultado con `r.ok == true`, que es **el código de
-     * salida**, no el efecto. En Android 13 el comando existe
-     * (`cmd power set-fixed-performance-mode-enabled true`) pero muchos teléfonos lo aceptan y
-     * **lo ignoran**, así que la app decía «hecho» sin que pasara nada.
+     * La única respuesta que da Android es el código de salida de la orden. Leído en
+     * `PowerManagerShellCommand.java` de AOSP: devuelve 0 **sólo si el HAL de energía aceptó
+     * el modo**, y -1 con «Failed to set FIXED_PERFORMANCE mode» si el teléfono no lo
+     * implementa. No hay nada más que leer.
      *
-     * Ahora se comprueba el ajuste que el sistema deja escrito, y si no cambia se dice tal cual.
-     * Y si el comando no existe en este teléfono —pasó con la consulta que la app usaba, que no
-     * existe en ninguna versión de Android— se dice **qué comando** y **qué contestó**, en vez
-     * de «sin detalle».
+     * La versión anterior desconfiaba de ese código y, tras un 0, leía el ajuste global
+     * `power_fixed_performance_mode_enabled` para «comprobar el efecto». Ese ajuste no existe
+     * en ninguna versión de Android: salía siempre vacío y la app decía «el fabricante no lo
+     * aplica» en todos los teléfonos, también en los que acababan de aceptarlo. El interruptor
+     * parecía roto sin estarlo.
      */
     fun modoRendimiento(activar: Boolean): Resultado {
         if (!shell.disponible()) return Resultado(false, Via.NINGUNA, "Shizuku no está activo.")
-        val ajuste = "power_fixed_performance_mode_enabled"
-        val antes = shell.correr("settings get global $ajuste")?.texto?.trim().orEmpty()
-        val r = shell.correr("cmd power set-fixed-performance-mode-enabled $activar")
-        if (r == null) {
-            return Resultado(false, Via.SHIZUKU, "El servicio de energía no respondió.")
-        }
+        val orden = "cmd power set-fixed-performance-mode-enabled $activar"
+        val r = shell.correr(orden)
+            ?: return Resultado(false, Via.SHIZUKU, "El servicio de energía no respondió.")
+        val lineas = listOf("pedido: $orden", "código: ${r.codigo}",
+            "respuesta: ${r.texto.ifBlank { "(vacía)" }}")
         if (r.codigo != 0) {
-            // El mensaje del sistema, tal cual: es lo único que permite arreglarlo.
+            val sinHal = r.texto.contains("FIXED_PERFORMANCE") || r.texto.contains("Power HAL")
             return Resultado(
                 ok = false,
                 via = Via.SHIZUKU,
-                detalle = "Este teléfono rechazó el modo rendimiento (código ${r.codigo}): " +
-                    r.motivo + ". No se ha cambiado nada.",
-                lineas = listOf(
-                    "pedido: cmd power set-fixed-performance-mode-enabled $activar",
-                    "respuesta: ${r.texto.ifBlank { "(vacía)" }}",
-                ),
+                detalle = if (sinHal)
+                    "Este teléfono no implementa el modo rendimiento fijo: el fabricante no lo " +
+                        "conectó al HAL de energía. No se ha cambiado nada y no se puede prometer más."
+                else
+                    "Este teléfono rechazó el modo rendimiento (código ${r.codigo}): " +
+                        r.motivo + ". No se ha cambiado nada.",
+                lineas = lineas,
             )
         }
-        val despues = shell.correr("settings get global $ajuste")?.texto?.trim().orEmpty()
-        val esperado = if (activar) "1" else "0"
-        val cambio = despues == esperado && despues != antes
         return Resultado(
             ok = true,
             via = Via.SHIZUKU,
-            detalle = if (cambio)
-                "Modo rendimiento fijo ${if (activar) "activado" else "desactivado"}, y el " +
-                    "sistema lo ha registrado ($ajuste = $despues). Sube el consumo y el calor."
+            detalle = if (activar)
+                "Modo rendimiento fijo activado: el servicio de energía aceptó la orden. Sube " +
+                    "el consumo y el calor. Android no lo guarda: tras reiniciar hay que pedirlo otra vez."
             else
-                "El comando se aceptó, pero el sistema no ha cambiado el ajuste " +
-                    "($ajuste sigue en «${despues.ifBlank { "vacío" }}»). En este teléfono el " +
-                    "fabricante no lo aplica: no se puede prometer más.",
-            lineas = listOf(
-                "ajuste antes: ${antes.ifBlank { "(vacío)" }}",
-                "ajuste después: ${despues.ifBlank { "(vacío)" }}",
-            ),
+                "Modo rendimiento fijo desactivado: el servicio de energía aceptó la orden.",
+            lineas = lineas,
         )
     }
 

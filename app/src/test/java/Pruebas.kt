@@ -1677,13 +1677,22 @@ run {
                 check("la prueba de escritura no toca una propiedad del sistema",
                     !c.contains("setprop ro.product.marketname"))
                 check("después de escribir, vuelve a leer y restaura",
-                    c.contains("getprop $" + "clave") && c.contains("setprop $" + "clave"))
+                    c.contains("getprop $" + "clave") && c.contains("setprop $" + "clave '$" + "antes'"))
             }
 
-            // 5. El modo rendimiento no se cree el código de salida: comprueba el efecto.
+            // 5. El modo rendimiento se juzga por el código de salida de la orden, que es lo único
+            //    que Android contesta. El ajuste `power_fixed_performance_mode_enabled` que se
+            //    leía «para comprobar el efecto» no existe en ninguna versión de Android: la
+            //    regla anterior de esta prueba obligaba a usarlo, y por eso el interruptor decía
+            //    «el fabricante no lo aplica» en todos los teléfonos.
             val sistema = fuentes.firstOrNull { it.name == "Sistema.kt" }
-            check("el modo rendimiento se verifica por el ajuste, no por el código",
-                sistema != null && sistema.readText().contains("power_fixed_performance_mode_enabled"))
+            check("ningún código lee el ajuste inventado del modo rendimiento",
+                !todo.contains("power_fixed_performance_mode_enabled"))
+            check("ni pregunta `cmd power help`, que devuelve -1 siempre",
+                !todo.contains("cmd power help"))
+            check("la prueba de escritura usa una propiedad que la vía ADB puede escribir",
+                io.github.labandita.glreborn.core.Compatibilidad.escribibleSinRoot(
+                    io.github.labandita.glreborn.core.Compatibilidad.CLAVE_PRUEBA))
             if (sistema != null) {
                 check("y si el fabricante lo ignora, lo dice",
                     sistema.readText().contains("no se puede prometer más"))
@@ -2003,6 +2012,54 @@ run {
             rpen.clasificar("1", "1") == io.github.labandita.glreborn.core.Capacidad.Estado.COMPLETO)
         check("sin valor esperado, responder ya es completo",
             rpen.clasificar("lo que sea", null) == io.github.labandita.glreborn.core.Capacidad.Estado.COMPLETO)
+
+        // ── Las dos pruebas de diagnóstico que mentían (2026-11-10) ──
+        // Lo que se vio en un teléfono: «Failed to set property 'persist.reborn.prueba'» y
+        // «Modo rendimiento (cmd): Power manager (power) commands: help …».
+        val cpd = io.github.labandita.glreborn.core.Compatibilidad
+        val est = io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado
+        val cpi = io.github.labandita.glreborn.core.Compatibilidad(io.github.labandita.glreborn.shizuku.Shell())
+        check("debug.* lo puede escribir la vía ADB", cpd.escribibleSinRoot("debug.reborn.prueba"))
+        check("persist.debug.* también", cpd.escribibleSinRoot("persist.debug.algo"))
+        check("persist.reborn.* NO: cae en default_prop", !cpd.escribibleSinRoot("persist.reborn.prueba"))
+        check("ro.product.* tampoco", !cpd.escribibleSinRoot("ro.product.model"))
+        check("la clave protegida es de las que piden root", !cpd.escribibleSinRoot(cpd.CLAVE_PROTEGIDA))
+        check("uid 0 es root", cpi.esRootDe("0\n") && !cpi.esRootDe("2000") && !cpi.esRootDe(null))
+
+        val w = "Escribir y deshacer una propiedad"
+        check("escritura leída de vuelta: pasa",
+            cpi.juzgarEscritura(w, "debug.reborn.prueba", 0, "", "1").resultado == est.PASA)
+        check("sin gestor: falla y lo dice",
+            cpi.juzgarEscritura(w, "debug.reborn.prueba", null, "", "").let { it.resultado == est.FALLA && it.detalle.contains("sin respuesta") })
+        val rechazo = cpi.juzgarEscritura(w, "debug.reborn.prueba", 1,
+            "Failed to set property 'debug.reborn.prueba' to '1'. See dmesg for error reason.", "")
+        check("rechazo de Android: falla, nombra la propiedad y no dice «sonó bien»",
+            rechazo.resultado == est.FALLA && rechazo.detalle.contains("debug.reborn.prueba") && !rechazo.detalle.contains("sonó bien"))
+        check("otro valor al leer: falla", cpi.juzgarEscritura(w, "debug.reborn.prueba", 0, "", "7").resultado == est.FALLA)
+
+        check("modo fijo aceptado (código 0): pasa", cpi.juzgarModoFijo(34, 0, "").resultado == est.PASA)
+        val sinHal = cpi.juzgarModoFijo(33, 255,
+            "Failed to set FIXED_PERFORMANCE mode\nThis is likely because Power HAL AIDL is not implemented on this device")
+        check("sin HAL: falla y dice que el teléfono no lo implementa",
+            sinHal.resultado == est.FALLA && sinHal.detalle.contains("no implementa"))
+        check("Android 10 no tiene la orden: no aplica, sin ejecutar nada",
+            cpi.juzgarModoFijo(29, null, "").resultado == est.NO_APLICA)
+        check("sin gestor en Android 11+: falla", cpi.juzgarModoFijo(30, null, "").resultado == est.FALLA)
+        // La salida exacta que se vio en el teléfono, con el código que `help` devuelve siempre.
+        val ayuda = cpi.juzgarModoFijo(34, 255, "Power manager (power) commands:\n  help\n    Print this help text.")
+        check("la ayuda de `cmd power` ya no se lee como «el servicio no responde»",
+            !ayuda.detalle.contains("no responde"))
+        check("la sonda del modo fijo es la orden real, no `help`",
+            cpd.SONDA_MODO_FIJO == "cmd power set-fixed-performance-mode-enabled false")
+        check("penetración: la escritura de propiedades prueba una clave escribible",
+            rpen.PRUEBAS.none { it.second.contains("setprop persist.reborn") })
+        val rfijo = io.github.labandita.glreborn.core.Rendimiento.catalogo.first { it.id == "rendimiento-fijo" }
+        check("la acción de rendimiento fijo se comprueba por el código de salida",
+            rfijo.esperado == "0" && rfijo.comprobar.endsWith("echo \$?") && rfijo.androidMinimo == 30)
+        check("y esa comprobación da por bueno un 0 y por malo un 255",
+            io.github.labandita.glreborn.core.Rendimiento.comprueba("0\n", rfijo.esperado) &&
+                !io.github.labandita.glreborn.core.Rendimiento.comprueba("255\n", rfijo.esperado))
+
         check("todas las pruebas de penetración llevan comando", rpen.PRUEBAS.all { it.second.isNotBlank() })
         check("y ninguna promete root sin probarlo", rpen.PRUEBAS.any { it.second == "su -c id" })
     }

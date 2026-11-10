@@ -115,20 +115,21 @@ object Rendimiento {
             queHace = "Pide al sistema el modo de rendimiento sostenido (el mismo que activan " +
                 "algunos juegos). Gasta más batería y calienta más. Idea de «Performance Mode».",
             aplicar = listOf("cmd power set-fixed-performance-mode-enabled true"),
-            // La comprobación de antes era un comando **que no existe** (Android 13 sólo tiene
-            // set-mode, set-fixed-... y help): salía siempre código 255 y la acción parecía rota
-            // en todos los teléfonos. Lo que sí se puede leer es el ajuste que el sistema deja.
-            comprobar = "settings get global power_fixed_performance_mode_enabled",
-            esperado = "1",
+            // La comprobación es el código de salida de la propia orden, que es lo único que
+            // Android contesta: 0 sólo si el HAL de energía aceptó el modo (AOSP,
+            // PowerManagerShellCommand). Repetir «true» no cambia nada si ya está encendido.
+            // Antes se leía el ajuste `power_fixed_performance_mode_enabled`, que no existe:
+            // nunca daba 1 y la acción parecía rota en todos los teléfonos.
+            comprobar = "cmd power set-fixed-performance-mode-enabled true >/dev/null 2>&1; echo \$?",
+            esperado = "0",
             revertir = listOf("cmd power set-fixed-performance-mode-enabled false"),
             riesgo = Riesgo.MEDIO,
             necesitaRoot = false,
             inspirado = "Performance Mode · CPU Booster · AY Lightning Pro",
-            androidMinimo = 29,
-            aviso = "Se comprueba el ajuste que el sistema escribe " +
-                "(`power_fixed_performance_mode_enabled`). Muchos fabricantes aceptan la orden y " +
-                "la ignoran: si el ajuste no cambia, la app te lo dirá en vez de dar por hecho " +
-                "que funcionó.",
+            androidMinimo = 30,
+            aviso = "La orden existe desde Android 11. Se comprueba con el código que devuelve " +
+                "el servicio de energía: si no es 0, tu teléfono no implementa este modo y la " +
+                "app te lo dirá. No se guarda: tras reiniciar hay que aplicarlo otra vez.",
         ),
         Accion(
             id = "thermal",
