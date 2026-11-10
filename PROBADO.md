@@ -182,3 +182,65 @@ aapt2 dump xmltree --file res/e5.xml GLToolsReborn-1.5.0-release.apk   # red cer
 En la app: si abre y se ve «Leyendo el teléfono…» antes que nada, el ANR está resuelto.
 Después: **Aprender → Generar todos**, y debería aparecer tu TECNO con su GPU y su
 OpenGL ES leídos del aparato.
+
+---
+
+# 1.6.0 — el NPE del arranque, datos reales y las funciones de los módulos
+
+Fecha: 9 de noviembre de 2026.
+
+## El fallo que reportó el usuario: `NullPointerException` al arrancar
+
+Pantalla de error con el mensaje real (la red de seguridad de la 1.5.0 funcionó, eso sí).
+
+**Causa, en el código:** en `Director`, `var modo: Modo = cargarModo()` se inicializaba
+antes de que existiera `private val prefs`, que estaba declarado **dos líneas más abajo**.
+Kotlin inicializa las propiedades en orden de declaración → `prefs` era `null` al llamar a
+`getString` → el constructor reventaba y la app moría antes de pintar.
+
+| Antes | Ahora |
+|---|---|
+| `modo` usaba `prefs` antes de existir | `prefs` se declara antes y con `by lazy` |
+| una excepción en el constructor = app muerta | `cargarModo()` tiene su `try/catch` → arranca en SEGURO |
+| nada lo detectaba | **prueba que lee `Director.kt`** y comprueba que `prefs` va antes que `modo` |
+
+## Datos reales (no relleno)
+
+| Bloque | Medido |
+|---|---|
+| TOP500 | **7.000 posiciones** (14 ediciones 2019-2025) + los **14 XML originales** |
+| Google Play | **54.434 dispositivos** + el CSV original |
+| mobolist.net | **1.386 fichas** con chipset y GPU (1.051 con GPU, 847 con versión de Android) |
+| Wikipedia | 63 Snapdragon + 38 MediaTek + 78 GPUs Adreno |
+| Peso de los datos | **14,33 MB** sin comprimir |
+
+## Peso del APK, con las dos versiones medidas
+
+| APK | Peso | Contenido |
+|---|---|---|
+| normal | **3.157.571 B (3,01 MB)** | el ZIP comprime los datos al 21% |
+| `-sin-comprimir` | **16.256.459 B (15,50 MB)** | datos crudos: idénticos, se abren sin descomprimir |
+
+No hay un byte de relleno en ninguno de los dos: `./gradlew :app:assembleRelease
+-PrebornDatos=crudo` produce el segundo desde el mismo código.
+
+## Lo que se ha comprobado
+
+| Comprobación | Resultado |
+|---|---|
+| `:app:pruebasNucleo` | **228 comprobaciones**, 0 fallos |
+| `:app:lintDebug` | 0 errores |
+| `apksigner verify` | OK · misma clave `1ff4c6ee…` (actualiza encima de 1.5.0) |
+| `versionCode` | 7 · `1.6.0` |
+| Documentos dentro del APK | los 14 XML del TOP500 y el CSV de Google, verificados con `unzip -p` |
+| Tu TECNO BG7 | hallado en el catálogo oficial de Google dentro del APK |
+
+## Lo que NO está probado
+
+- **Sigo sin poder instalarlo aquí**: no hay `/dev/kvm`. El NPE está identificado y
+  corregido en el código, y ahora hay una prueba que lo vigila; pero el arranque en tu
+  teléfono lo confirmas tú.
+- Las acciones de *Rendi.* están probadas en cuanto a **qué comando generan, cómo
+  comprueban y cómo revierten** (42 comprobaciones). No se han ejecutado en un teléfono
+  real desde aquí. En tu TECNO, la que tiene más sentido probar primero es **AOT sobre una
+  app concreta**: es la de riesgo bajo y su comprobación es un `grep -c` que dice la verdad.

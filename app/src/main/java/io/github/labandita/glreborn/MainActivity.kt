@@ -136,6 +136,13 @@ private fun App(
     var resumenCompat by remember { mutableStateOf("") }
     var fichas by remember { mutableStateOf<List<Ficha>>(emptyList()) }
     var datosSonda by remember { mutableStateOf<Sonda.Datos?>(null) }
+    var edicionesTop by remember { mutableStateOf<List<Datos.Edicion>>(emptyList()) }
+    var edicionElegida by remember { mutableStateOf("") }
+    var sistemasTop by remember { mutableStateOf<List<Datos.Sistema>>(emptyList()) }
+    var catalogoDispositivos by remember { mutableStateOf<List<Datos.Dispositivo>>(emptyList()) }
+    var socs by remember { mutableStateOf<List<Datos.Soc>>(emptyList()) }
+    var manifiesto by remember { mutableStateOf<String?>(null) }
+    var fichasMobolist by remember { mutableStateOf<List<Datos.Ficha>>(emptyList()) }
     var biblioteca by remember { mutableStateOf<List<PerfilDispositivo>>(emptyList()) }
     val contexto = LocalContext.current
     var panelDe by remember { mutableStateOf<String?>(null) }
@@ -181,6 +188,54 @@ private fun App(
     }
 
     LaunchedEffect(Unit) { releer() }
+
+    // Los datos del APK se leen una vez, en segundo plano: son varios MB y no pueden
+    // bloquear el primer pintado. Mientras tanto la pantalla ya está en pie.
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val ctx = contexto
+            val eds = Datos.ediciones(ctx)
+            val disp = Datos.dispositivos(ctx)
+            val soc = Datos.socs(ctx)
+            val fichas = Datos.fichas(ctx)
+            val man = Datos.manifiesto(ctx)?.let { m ->
+                runCatching {
+                    val bloques = m.optJSONArray("bloques")
+                    buildString {
+                        appendLine("«${m.optString("que_es")}»")
+                        appendLine()
+                        if (bloques != null) {
+                            for (i in 0 until bloques.length()) {
+                                val b = bloques.optJSONObject(i) ?: continue
+                                appendLine("· ${b.optString("id").uppercase()} — ${b.optString("que")}")
+                                appendLine("  fuente: ${b.optString("fuente")} ${b.optString("url")}")
+                            }
+                        }
+                        val peso = m.optJSONObject("peso")
+                        if (peso != null) {
+                            appendLine()
+                            appendLine("Peso total: ${peso.optInt("total") / 1048576.0} MB")
+                        }
+                        appendLine()
+                        appendLine(m.optString("nota"))
+                    }
+                }.getOrNull()
+            }
+            val primera = eds.firstOrNull()?.edicion.orEmpty()
+            val sis = if (primera.isNotBlank()) Datos.top500(ctx, primera) else emptyList()
+            withContext(Dispatchers.Main) {
+                edicionesTop = eds
+                catalogoDispositivos = disp
+                socs = soc
+                fichasMobolist = fichas
+                manifiesto = man
+                if (edicionElegida.isBlank() && primera.isNotBlank()) {
+                    edicionElegida = primera
+                    sistemasTop = sis
+                }
+            }
+        }
+    }
     LaunchedEffect(estado) { if (director.hayShell()) releerShell() }
 
     // El panel de cada app: hoja de cristal a pantalla completa.
@@ -305,6 +360,38 @@ private fun App(
             panelDe = paquete
         },
         datosSonda = datosSonda,
+        edicionesTop = edicionesTop,
+        edicionElegida = edicionElegida,
+        onEdicion = { ed ->
+            edicionElegida = ed
+            alcance.launch {
+                sistemasTop = withContext(Dispatchers.IO) { Datos.top500(contexto, ed) }
+            }
+        },
+        sistemasTop = sistemasTop,
+        catalogoDispositivos = catalogoDispositivos,
+        socs = socs,
+        manifiesto = manifiesto,
+        fichasMobolist = fichasMobolist,
+        accionesRendimiento = Rendimiento.disponibles(android.os.Build.VERSION.SDK_INT),
+        sinRootRendimiento = Rendimiento.sinRoot,
+        sdkTelefono = android.os.Build.VERSION.SDK_INT,
+        onRendimiento = { accion ->
+            if (accion != null) {
+                alcance.launch {
+                    resultado = withContext(Dispatchers.IO) {
+                        proteger(onFallo) { director.rendimiento().aplicar(accion) }
+                    }
+                }
+            }
+        },
+        onRevertirRendimiento = { accion ->
+            alcance.launch {
+                resultado = withContext(Dispatchers.IO) {
+                    proteger(onFallo) { director.rendimiento().revertir(accion) }
+                }
+            }
+        },
         biblioteca = biblioteca,
         onSondar = { alcance.launch { releerShell() } },
         onGuardarPerfil = { p ->

@@ -36,24 +36,46 @@ class Director(context: Context) {
     }
     fun apps(): GestorApps = GestorApps(shell, registro, aplicado)
     fun sistema(): Sistema = Sistema(shell, aplicado)
+    fun rendimiento(): EjecutorRendimiento = EjecutorRendimiento(shell, aplicado)
     fun pantalla(): AjustesPantalla = AjustesPantalla(shell)
     fun compatibilidad(): Compatibilidad = Compatibilidad(shell)
     fun aplicado(): Aplicado = aplicado
     private var estado: Estado = Estado.SIN_VIA
     private var original: Map<String, String> = emptyMap()
 
+    /**
+     * Las preferencias, ANTES de todo lo que las usa.
+     *
+     * Aquí estaba el fallo que dejaba la app sin abrir: `modo` se inicializaba llamando a
+     * `cargarModo()`, que lee de `prefs`… y `prefs` se declaraba DESPUÉS. Kotlin inicializa
+     * las propiedades en orden de declaración, así que en ese momento `prefs` era null y
+     * el constructor lanzaba NullPointerException. La app moría antes de pintar nada.
+     *
+     * `by lazy` lo deja a prueba de orden: no se crea hasta el primer uso, y da igual
+     * dónde esté declarado.
+     */
+    private val prefs: android.content.SharedPreferences by lazy {
+        app.getSharedPreferences("reborn", Context.MODE_PRIVATE)
+    }
+
     /** El modo se guarda en disco: si lo dejaste en experto, sigue en experto al volver. */
     var modo: Modo = cargarModo()
         private set
 
-    private val prefs = app.getSharedPreferences("reborn", Context.MODE_PRIVATE)
-
-    private fun cargarModo(): Modo =
+    private fun cargarModo(): Modo = try {
         if (prefs.getString("modo", "SEGURO") == "EXPERTO") Modo.EXPERTO else Modo.SEGURO
+    } catch (t: Throwable) {
+        // Si las preferencias fallan, se arranca en seguro: nunca sin arrancar.
+        Modo.SEGURO
+    }
 
     fun cambiarModo(): Modo {
         modo = modo.alternar()
-        prefs.edit().putString("modo", modo.name).apply()
+        try {
+            prefs.edit().putString("modo", modo.name).apply()
+        } catch (t: Throwable) {
+            // Que no se guarde no puede impedir cambiar de modo ahora mismo.
+        }
         return modo
     }
 

@@ -11,8 +11,8 @@ android {
         applicationId "io.github.labandita.glreborn"
         minSdk 26
         targetSdk 35
-        versionCode 6
-        versionName "1.5.0"
+        versionCode 7
+        versionName "1.6.0"
     }
 
     // La firma se lee del entorno. NO hay ninguna clave escrita en este archivo:
@@ -27,6 +27,21 @@ android {
                 keyAlias System.getenv("REBORN_KEY_ALIAS") ?: "reborn"
                 keyPassword System.getenv("REBORN_KEY_PASS")
             }
+        }
+    }
+
+    /*
+      Cómo se guardan los datos dentro del APK.
+
+      Por defecto el ZIP los comprime: 14,3 MB de datos reales ocupan 3 MB en el APK.
+      Con -PrebornDatos=crudo se guardan tal cual: el APK sube a ~15 MB, el contenido es
+      exactamente el mismo, y a cambio se leen sin descomprimir (en un teléfono de 4 GB
+      eso se nota al abrir la base de 2,5 MB) y se pueden verificar byte a byte con
+      `unzip`. No se añade ni un dato de relleno en ninguno de los dos casos.
+    */
+    androidResources {
+        if (project.hasProperty("rebornDatos") && project.property("rebornDatos") == "crudo") {
+            noCompress += ["json", "xml", "csv"]
         }
     }
 
@@ -67,9 +82,18 @@ dependencies {
 // instalar el APK, pero la lógica de perfiles y escritura no toca Android y se prueba
 // de verdad. Lo que necesita un teléfono se declara como no probado.
 android.sourceSets.debug.java.srcDirs += 'src/test/java'
+// org.json sólo para las pruebas: en el APK lo pone Android, pero en la máquina de
+// compilación no existe. Es una dependencia de verificación, no viaja en la app.
+configurations { pruebasJson }
+
+dependencies {
+    pruebasJson 'org.json:json:20240303'
+}
+
 tasks.register('pruebasNucleo', JavaExec) {
     dependsOn 'compileDebugKotlin'
     group = 'verification'
-    classpath = files("$buildDir/tmp/kotlin-classes/debug") + configurations.debugRuntimeClasspath
+    classpath = files("$buildDir/tmp/kotlin-classes/debug") +
+        configurations.debugRuntimeClasspath + configurations.pruebasJson
     mainClass = 'PruebasKt'
 }

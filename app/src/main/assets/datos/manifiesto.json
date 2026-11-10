@@ -1,0 +1,64 @@
+{
+ "generado": "2026-11-09",
+ "que_es": "Datos reales de terceros incluidos en el APK para que la app funcione sin conexión. Cada bloque dice su fuente y su URL.",
+ "bloques": [
+  {
+   "id": "top500",
+   "que": "14 ediciones de la lista TOP500 (2019-2025): 7.000 posiciones",
+   "fuente": "top500.org",
+   "url": "https://top500.org/lists/top500/",
+   "comprimido": "índice JSON por edición",
+   "original": "los 14 ficheros XML oficiales, sin comprimir, en top500/fuente/"
+  },
+  {
+   "id": "dispositivos",
+   "que": "54434 dispositivos del catálogo de Google Play",
+   "fuente": "Google",
+   "url": "https://storage.googleapis.com/play_public/supported_devices.csv",
+   "comprimido": "índice JSON",
+   "original": "el CSV oficial, sin comprimir"
+  },
+  {
+   "id": "soc",
+   "que": "101 SoC con su GPU",
+   "fuente": "Wikipedia"
+  },
+  {
+   "id": "gpu",
+   "que": "78 GPUs Adreno con ALUs y MHz",
+   "fuente": "Wikipedia"
+  },
+  {
+   "id": "android",
+   "que": "28 versiones de Android con su API",
+   "fuente": "documentación de Android"
+  },
+  {
+   "id": "fichas",
+   "que": "1.386 modelos con SoC, GPU y versión de Android declarada",
+   "fuente": "mobolist.net",
+   "url": "https://www.mobolist.net/en",
+   "comprimido": "índice JSON",
+   "original": "las fichas se leyeron una a una; lo que la ficha no traía quedó vacío"
+  },
+  {
+   "id": "modulos",
+   "que": "59 fichas de módulos de AxManager leídas para ver qué hacen",
+   "fuente": "magiskmodule.com",
+   "url": "https://www.magiskmodule.com/category/axmanager-plugin",
+   "comprimido": "no se incluye: se usó para escribir Rendimiento.kt",
+   "original": "no se copia código ni diseño; ese sitio publica fichas, no código"
+  }
+ ],
+ "peso": {
+  "total": 14065512,
+  "xml_original": 8277628
+ },
+ "nota": "Los originales van SIN comprimir a propósito: se pueden verificar con `unzip`. Si se comprimieran, el APK pesaría varios MB menos con exactamente el mismo contenido. Se elige el peso para que se pueda comprobar todo sin herramientas.",
+ "fuentes_no_usadas": [
+  {
+   "url": "https://versus.com/es",
+   "por_que": "Su robots.txt responde con un desafío anti-bot: no permite el acceso automatizado. Se leyó una ficha a mano para comparar (el Tecno Spark 20C coincide con la ficha técnica), pero no se rastrea en bloque."
+  }
+ ]
+}

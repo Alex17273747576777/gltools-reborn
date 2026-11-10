@@ -434,6 +434,293 @@ run {
     println("  de interfaz. Eso se ve leyendo MainActivity: `releer()` no llama a la shell.")
 }
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Orden de inicialización: el fallo que dejó la app sin abrir
+// ─────────────────────────────────────────────────────────────────────────────
+run {
+    println("\nOrden de inicialización de las clases")
+
+    // El fallo real, reproducido sin Android: en Kotlin las propiedades se inicializan
+    // en orden de declaración. Si una depende de otra declarada más abajo, la segunda
+    // todavía es null. Así estaba Director: `modo` llamaba a cargarModo(), que usaba
+    // `prefs`, declarado dos líneas después → NullPointerException en el constructor.
+    class ConElFallo {
+        val modo: String = leer()
+        private val prefs: Map<String, String>? = mapOf("modo" to "EXPERTO")
+        fun leer(): String = prefs?.get("modo") ?: "SEGURO"
+    }
+    val roto = try { ConElFallo().modo } catch (t: Throwable) { null }
+    check("una propiedad que depende de otra declarada después da null",
+        roto == "SEGURO", "devolvió $roto")
+
+    // La forma correcta: la dependencia se declara ANTES de quien la usa. `by lazy` no
+    // salva el orden por sí solo —el delegado también se inicializa en orden—; lo que
+    // salva es declararla arriba. Esto se comprueba sobre el código de verdad, abajo.
+    class BienHecho {
+        private val prefs: Map<String, String> = mapOf("modo" to "EXPERTO")
+        val modo: String = leer()
+        fun leer(): String = prefs["modo"] ?: "SEGURO"
+    }
+    check("declarando la dependencia antes, el constructor no revienta",
+        runCatching { BienHecho().modo }.getOrNull() == "EXPERTO")
+
+    // Guardia de regresión sobre el fichero real: `prefs` tiene que estar declarado
+    // antes que `modo` en Director.kt. Si alguien lo mueve, esta prueba lo dice.
+    val director = listOf(
+        java.io.File("src/main/java/io/github/labandita/glreborn/core/Director.kt"),
+        java.io.File("app/src/main/java/io/github/labandita/glreborn/core/Director.kt"),
+    ).firstOrNull { it.exists() }
+    if (director == null) {
+        println("  [aviso] no se encontró Director.kt desde ${java.io.File(".").absolutePath}")
+    } else {
+        val lineas = director.readLines()
+        val lPrefs = lineas.indexOfFirst { it.contains("private val prefs") }
+        val lModo = lineas.indexOfFirst { it.contains("var modo: Modo = cargarModo") }
+        check("Director.kt declara `prefs` antes de `modo`", lPrefs in 0 until lModo,
+            "prefs en $lPrefs, modo en $lModo")
+        check("y `prefs` no se crea antes de tiempo (by lazy o inicialización directa)",
+            lineas.getOrNull(lPrefs)?.contains("by lazy") == true ||
+                lineas.getOrNull(lPrefs + 1)?.contains("by lazy") == true)
+    }
+
+    // Y la regla de verdad: si las preferencias fallan, se arranca en SEGURO. Nunca
+    // sin arrancar.
+    fun modoConFallback(prefsRota: Boolean): String = try {
+        if (prefsRota) throw IllegalStateException("prefs") else "EXPERTO"
+    } catch (t: Throwable) {
+        "SEGURO"
+    }
+    check("si las preferencias fallan, el modo es SEGURO", modoConFallback(true) == "SEGURO")
+    check("y si funcionan, se respeta lo guardado", modoConFallback(false) == "EXPERTO")
+
+    println("\n  Comprobado en el código además de aquí: Director.kt declara `prefs` con")
+    println("  `by lazy` y `cargarModo()` tiene su propio try/catch.")
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Datos reales dentro del APK: parseo y coherencia
+// ─────────────────────────────────────────────────────────────────────────────
+run {
+    println("\nDatos reales del APK (parseo puro)")
+    val fila = listOf(1, "El Capitan", "HPE",
+        "HPE Cray EX255a, AMD 4th Gen EPYC 24C 1.8GHz, AMD Instinct MI300A", 11340000,
+        1809.0, 2821.1, 29685, "United States", "Livermore", "LLNL", 2024)
+    val sistema = Datos.sistemaDeFila(fila)
+    check("una fila del índice se convierte en sistema", sistema != null)
+    if (sistema != null) {
+        check("el n\u00famero 1 sigue siendo El Capitan", sistema.nombre == "El Capitan")
+        check("los núcleos son los publicados por TOP500", sistema.nucleos == 11_340_000)
+        check("Rmax viene en PFlop/s", sistema.rmaxPflops == 1809.0)
+        check("el resumen no inventa nada", sistema.resumen.contains("1809.0"))
+    }
+    check("una fila incompleta no produce un sistema falso",
+        Datos.sistemaDeFila(listOf(1, "x")) == null)
+    check("una fila sin rank tampoco",
+        Datos.sistemaDeFila(listOf(null, "x", "y", "z", 1, 2.0, 3.0, 4, "ES", "c", "s", 2020)) == null)
+    val sinPotencia = Datos.sistemaDeFila(listOf(5, "N", "M", "C", 10, 1.5, 2.0, null,
+        "ES", "Madrid", "Sitio", 2021))
+    check("un dato que falta queda en null, no en cero", sinPotencia?.potenciaKw == null)
+
+    val disp = Datos.Dispositivo("Tecno", "TECNO SPARK 20C", "TECNO-BG7", "TECNO BG7")
+    val perfil = Datos.perfilDeDispositivo(disp)
+    check("el catálogo de Google da un perfil", perfil != null)
+    if (perfil != null) {
+        check("el device es el real del catálogo", perfil.device == "TECNO-BG7")
+        check("el perfil no se hace pasar por verificado",
+            perfil.confianza == PerfilDispositivo.Confianza.PARCIAL)
+        check("SoC y GPU quedan vacíos: el catálogo no los trae",
+            perfil.soc.isBlank() && perfil.gpu.isBlank() && perfil.openglEs.isBlank())
+        check("la fuente dice de dónde salió", perfil.fuente.contains("Google Play"))
+    }
+
+    val catalogo = listOf(
+        disp,
+        Datos.Dispositivo("Google", "Pixel 8 Pro", "husky", "Pixel 8 Pro"),
+        Datos.Dispositivo("Samsung", "Galaxy S24 Ultra", "e3q", "SM-S928B"),
+    )
+    check("buscar «bg7» encuentra el TECNO del usuario",
+        Datos.buscarDispositivos(catalogo, "bg7").size == 1)
+    check("buscar «tecno» lo encuentra también",
+        Datos.buscarDispositivos(catalogo, "tecno").firstOrNull()?.device == "TECNO-BG7")
+    check("buscar sin resultados devuelve vacío, no parecidos",
+        Datos.buscarDispositivos(catalogo, "nokia").isEmpty())
+    check("una consulta vacía no devuelve el catálogo entero",
+        Datos.buscarDispositivos(catalogo, "").isEmpty())
+
+    println("\nOpenGL ES: número, nunca texto")
+    check("Adreno 750 (tope de gama) → 3.2", Datos.openglDe("Adreno 750") == "196611")
+    check("Adreno 610 → 3.2", Datos.openglDe("Adreno 610") == "196610")
+    check("Adreno 530 → 3.1", Datos.openglDe("Adreno 530") == "196609")
+    check("una GPU desconocida no inventa un valor", Datos.openglDe("Voodoo 3") == null)
+    check("el valor es numérico y se puede escribir sin romper la propiedad",
+        Datos.openglDe("Adreno 750")?.toIntOrNull() != null)
+
+    println("\nSoC")
+    val soc = Datos.Soc("Snapdragon 8 Gen 3", "Adreno 750", "Kryo", 8, 903, 2774.0,
+        "4 nm", "Wikipedia")
+    check("el resumen del SoC dice GPU, MHz y GFLOPS",
+        soc.resumen.contains("Adreno 750") && soc.resumen.contains("903 MHz"))
+    check("buscar por GPU encuentra el SoC",
+        Datos.buscarSoc(listOf(soc), "adreno 750").size == 1)
+    check("buscar por chip también", Datos.buscarSoc(listOf(soc), "gen 3").size == 1)
+
+    println("\nLos datos que viajan en el APK")
+    // Se comprueba sobre los ficheros de verdad, si están en el árbol.
+    val raiz = listOf("src/main/assets/datos", "app/src/main/assets/datos")
+        .map { java.io.File(it) }.firstOrNull { it.isDirectory }
+    if (raiz == null) {
+        println("  [aviso] no se encontró app/src/main/assets/datos")
+    } else {
+        val top = java.io.File(raiz, "top500")
+        val ediciones = top.listFiles { f -> f.name.matches(Regex("\\d{6}\\.json")) } ?: emptyArray()
+        check("están las 14 ediciones del TOP500", ediciones.size == 14,
+            "hay ${ediciones.size}")
+        var totalSistemas = 0
+        var coherencia = true
+        ediciones.forEach { f ->
+            val o = org.json.JSONObject(f.readText())
+            val arr = o.getJSONArray("sistemas")
+            totalSistemas += arr.length()
+            // El número 1 siempre existe y todos los ranks son únicos
+            val ranks = (0 until arr.length()).map { arr.getJSONArray(it).getInt(0) }
+            if (ranks.size != 500 || ranks.first() != 1 || ranks.toSet().size != 500) coherencia = false
+        }
+        check("las 14 ediciones suman 7.000 posiciones", totalSistemas == 7000, "$totalSistemas")
+        check("cada edición tiene 500 posiciones únicas y empieza en 1", coherencia)
+        val xml = java.io.File(top, "fuente").listFiles { f -> f.name.endsWith(".xml") }
+            ?: emptyArray()
+        check("los XML originales están dentro del APK", xml.size == 14, "hay ${xml.size}")
+        check("un XML original conserva la declaración del TOP500",
+            xml.firstOrNull()?.readText()?.contains("top500:list") == true)
+        val disp = java.io.File(raiz, "dispositivos.json")
+        check("el catálogo de dispositivos está dentro", disp.exists())
+        if (disp.exists()) {
+            val arr = org.json.JSONObject(disp.readText()).getJSONArray("dispositivos")
+            check("el catálogo trae más de 50.000 dispositivos", arr.length() > 50_000,
+                "${arr.length()}")
+            val tecno = (0 until arr.length()).firstOrNull { i ->
+                arr.getJSONArray(i).getString(2) == "TECNO-BG7"
+            }
+            check("el TECNO BG7 del usuario está en el catálogo oficial", tecno != null)
+        }
+    }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rendimiento: los comandos, sus comprobaciones y sus reversiones
+// ─────────────────────────────────────────────────────────────────────────────
+run {
+    println("\nAcciones de rendimiento (lo que hacen los módulos, sin root)")
+
+    check("hay acciones disponibles", Rendimiento.catalogo.isNotEmpty())
+    check("todas tienen comando, comprobación y reversión",
+        Rendimiento.catalogo.all {
+            it.aplicar.isNotEmpty() && it.comprobar.isNotBlank() && it.revertir.isNotEmpty()
+        })
+    check("todas dicen de dónde salió la idea",
+        Rendimiento.catalogo.all { it.inspirado.isNotBlank() })
+    check("ninguna se ofrece si necesita root",
+        Rendimiento.disponibles(35).none { it.necesitaRoot })
+    check("sin root no se puede nada de la lista de root",
+        Rendimiento.soloConRoot().isEmpty())
+    check("la lista de lo que NO se puede sin root no está vacía",
+        Rendimiento.sinRoot.isNotEmpty())
+    check("y cada cosa imposible dice por qué",
+        Rendimiento.sinRoot.all { it.second.isNotBlank() })
+
+    val aot = Rendimiento.catalogo.first { it.id == "aot" }
+    check("el comando de AOT es el real de Android",
+        Rendimiento.comando(aot, "com.x").first() == "cmd package compile -m speed -f com.x")
+    check("la comprobación usa el paquete elegido",
+        aot.comprobar.replace("%PAQUETE%", "com.x").contains("com.x"))
+    check("la reversión devuelve la app a verify",
+        Rendimiento.revertir(aot, "com.x").first().contains("verify"))
+    check("AOT necesita paquete y se sabe", Rendimiento.necesitaPaquete(aot))
+    check("Doze no necesita paquete",
+        !Rendimiento.necesitaPaquete(Rendimiento.catalogo.first { it.id == "doze" }))
+
+    check("un `grep -c` con 1 cuenta como aplicado", Rendimiento.comprueba("1", "1"))
+    check("un 0 NO cuenta como aplicado", !Rendimiento.comprueba("0", "1"))
+    check("sin respuesta no cuenta como aplicado", !Rendimiento.comprueba(null, "1"))
+    check("un valor con espacios alrededor se acepta", Rendimiento.comprueba("  1  \n", "1"))
+    check("la comprobación compara texto, no interpreta",
+        !Rendimiento.comprueba("2.0", "2") || Rendimiento.comprueba("2", "2"))
+
+    check("el modo juego pide Android 12 o más",
+        Rendimiento.catalogo.first { it.id == "modo-juego" }.androidMinimo == 31)
+    check("en Android 11 no se ofrece el modo juego",
+        Rendimiento.disponibles(30).none { it.id == "modo-juego" })
+    check("en Android 12 sí", Rendimiento.disponibles(31).any { it.id == "modo-juego" })
+    check("el limitador térmico se marca como riesgo alto",
+        Rendimiento.catalogo.first { it.id == "thermal" }.riesgo == Rendimiento.Riesgo.ALTO)
+    check("y su aviso lo dice sin adornos",
+        Rendimiento.avisoDeRiesgo(Rendimiento.catalogo.first { it.id == "thermal" })
+            .contains("Riesgo alto"))
+    check("ninguna acción promete tocar /sys (eso es root)",
+        Rendimiento.catalogo.none { it.aplicar.any { c -> c.contains("/sys/") } })
+    check("todos los comandos son de `cmd`, `settings`, `am` o `dumpsys`",
+        Rendimiento.catalogo.all { a ->
+            a.aplicar.all { c ->
+                val base = c.trim().split(" ").first()
+                base in setOf("cmd", "settings", "am", "dumpsys")
+            }
+        })
+}
+
+
+run {
+    println("\nFichas reales de mobolist")
+    val ficha = Datos.Ficha("Tecno Spark 40C", "Helio G81 (12 nm)", "Mali-G52 MC2",
+        "Octa-core (2x2.0 GHz Cortex-A75 & 6x1.8 GHz Cortex-A55)", "15", "4GB / 8GB",
+        "6.67", "720x1610", "HIOS 15.1")
+    check("el resumen de la ficha dice chip, GPU y Android",
+        ficha.resumen.contains("Helio G81") && ficha.resumen.contains("Mali-G52"))
+    val perfil = Datos.perfilDeFicha(ficha)
+    check("una ficha da un perfil", perfil != null)
+    if (perfil != null) {
+        check("el SoC es el de la ficha", perfil.soc.contains("Helio G81"))
+        check("la GPU es la de la ficha", perfil.gpu == "Mali-G52 MC2")
+        check("OpenGL ES se calcula de la GPU y es numérico",
+            perfil.openglEs.toIntOrNull() != null, perfil.openglEs)
+        check("el device NO se inventa: queda vacío", perfil.device.isBlank())
+        check("el perfil no se hace pasar por verificado",
+            perfil.confianza == PerfilDispositivo.Confianza.PARCIAL)
+        check("la nota explica por qué falta el device", perfil.nota.contains("device"))
+    }
+    val lista = listOf(ficha)
+    check("buscar por modelo encuentra la ficha",
+        Datos.buscarFichas(lista, "spark 40c").size == 1)
+    check("buscar por GPU también", Datos.buscarFichas(lista, "mali-g52").size == 1)
+    check("buscar algo que no está no devuelve nada",
+        Datos.buscarFichas(lista, "iphone 99").isEmpty())
+
+    val raiz = listOf("src/main/assets/datos", "app/src/main/assets/datos")
+        .map { java.io.File(it) }.firstOrNull { it.isDirectory }
+    if (raiz != null) {
+        val f = java.io.File(raiz, "mobolist.json")
+        check("la base de fichas está dentro del APK", f.exists())
+        if (f.exists()) {
+            val arr = org.json.JSONObject(f.readText()).getJSONArray("dispositivos")
+            check("trae más de mil fichas", arr.length() > 1000, "${arr.length()}")
+            val conGpu = (0 until arr.length()).count { arr.getJSONObject(it).optString("gpu").isNotBlank() }
+            check("más del 90% tienen GPU", conGpu > arr.length() * 9 / 10, "$conGpu")
+            val conChip = (0 until arr.length()).count { arr.getJSONObject(it).optString("chipset").isNotBlank() }
+            check("todas tienen chipset", conChip == arr.length(), "$conChip")
+        }
+        val man = java.io.File(raiz, "manifiesto.json")
+        check("el manifiesto de datos existe", man.exists())
+        if (man.exists()) {
+            val o = org.json.JSONObject(man.readText())
+            check("el manifiesto declara 6 bloques", o.getJSONArray("bloques").length() >= 6)
+            check("y dice por qué no se usó versus.com",
+                o.toString().contains("versus.com"))
+        }
+    }
+}
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

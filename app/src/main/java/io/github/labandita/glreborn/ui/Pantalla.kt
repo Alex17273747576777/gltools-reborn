@@ -30,6 +30,7 @@ enum class Seccion(val titulo: String, val icono: String) {
     COMPATIBILIDAD("Compat.", "◇"),
     APLICADO("Aplicado", "◐"),
     APRENDER("Aprender", "✧"),
+    RENDIMIENTO("Rendi.", "⚡"),
 }
 
 @Composable
@@ -65,6 +66,19 @@ fun PantallaPrincipal(
     fichas: List<Ficha>,
     onPanel: (String) -> Unit,
     datosSonda: Sonda.Datos?,
+    edicionesTop: List<Datos.Edicion>,
+    edicionElegida: String,
+    onEdicion: (String) -> Unit,
+    sistemasTop: List<Datos.Sistema>,
+    catalogoDispositivos: List<Datos.Dispositivo>,
+    socs: List<Datos.Soc>,
+    manifiesto: String?,
+    fichasMobolist: List<Datos.Ficha>,
+    accionesRendimiento: List<Rendimiento.Accion>,
+    sinRootRendimiento: List<Pair<String, String>>,
+    sdkTelefono: Int,
+    onRendimiento: (Rendimiento.Accion?) -> Unit,
+    onRevertirRendimiento: (Rendimiento.Accion) -> Unit,
     biblioteca: List<PerfilDispositivo>,
     onSondar: () -> Unit,
     onGuardarPerfil: (PerfilDispositivo) -> Unit,
@@ -84,6 +98,9 @@ fun PantallaPrincipal(
     var textoPegado by remember { mutableStateOf("") }
     var extraido by remember { mutableStateOf<Extractor.Extraido?>(null) }
     var candidatos by remember { mutableStateOf<List<Distribuida.Candidato>>(emptyList()) }
+    var consultaCatalogo by remember { mutableStateOf("") }
+    var consultaSoc by remember { mutableStateOf("") }
+    var consultaFicha by remember { mutableStateOf("") }
     val catalogoPerfiles = remember(biblioteca) {
         Distribuida.unir(Perfiles.todos, biblioteca)
     }
@@ -150,6 +167,65 @@ fun PantallaPrincipal(
                     item { Etiqueta("TOP500 · ${Supercomputadoras.censo()}") }
                     items(Supercomputadoras.todos) { s ->
                         TarjetaSuper(s, superActiva?.rank == s.rank) { onSimular(s) }
+                    }
+
+                    if (edicionesTop.isNotEmpty()) {
+                        item { Spacer(Modifier.height(10.dp)) }
+                        item {
+                            Etiqueta(
+                                "LAS 14 LISTAS OFICIALES · ${edicionesTop.sumOf { it.sistemas }} posiciones"
+                            )
+                        }
+                        item {
+                            Aviso(
+                                "Esto no es simulación: son las catorce ediciones publicadas por " +
+                                    "top500.org entre 2019 y 2025, con los XML originales dentro " +
+                                    "del APK. Elige una y salen sus 500 sistemas tal como se " +
+                                    "publicaron.",
+                                Cristal.cian,
+                            )
+                        }
+                        item {
+                            androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                items(edicionesTop) { e ->
+                                    val sel = e.edicion == edicionElegida
+                                    Column(
+                                        Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(
+                                                if (sel) Cristal.violeta.copy(alpha = 0.25f)
+                                                else Cristal.vidrioFuerte
+                                            )
+                                            .clickable { onEdicion(e.edicion) }
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text(
+                                            e.edicion,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (sel) Cristal.texto else Cristal.textoSuave,
+                                        )
+                                        Text("${e.sistemas}", fontSize = 9.sp,
+                                            color = Cristal.textoSuave)
+                                    }
+                                }
+                            }
+                        }
+                        items(sistemasTop.take(100)) { s ->
+                            FilaSistemaTop(s)
+                        }
+                        if (sistemasTop.size > 100) {
+                            item {
+                                Text(
+                                    "Se muestran los 100 primeros de ${sistemasTop.size}. " +
+                                        "Los 500 están en el APK: ${edicionElegida}.",
+                                    fontSize = 10.sp, color = Cristal.textoSuave,
+                                )
+                            }
+                        }
                     }
                     item { Spacer(Modifier.height(4.dp)) }
                     item {
@@ -373,6 +449,153 @@ fun PantallaPrincipal(
                         }
                     }
 
+                    // ── Catálogo oficial de Google Play
+                    item { Etiqueta("CATÁLOGO REAL DE DISPOSITIVOS (${catalogoDispositivos.size})") }
+                    item {
+                        Text(
+                            "El catálogo de Google Play, tal cual: marca, nombre comercial, " +
+                                "device y modelo de cada aparato que existe. Busca el tuyo por " +
+                                "marca o modelo y sale un perfil con sus datos reales.",
+                            fontSize = 11.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
+                        )
+                    }
+                    item {
+                        CampoTexto(
+                            valor = consultaCatalogo,
+                            onCambio = { consultaCatalogo = it },
+                            pista = "tecno bg7 · samsung s24 · pixel 8…",
+                        )
+                    }
+                    val halladosCatalogo = if (consultaCatalogo.isBlank()) emptyList()
+                    else Datos.buscarDispositivos(catalogoDispositivos, consultaCatalogo, 30)
+                    if (consultaCatalogo.isNotBlank()) {
+                        if (halladosCatalogo.isEmpty()) {
+                            item {
+                                Text(
+                                    "Ningún aparato del catálogo coincide con «$consultaCatalogo».",
+                                    fontSize = 12.sp, color = Cristal.ambar,
+                                )
+                            }
+                        } else {
+                            items(halladosCatalogo) { d ->
+                                val p = Datos.perfilDeDispositivo(d)
+                                Column(Modifier.fillMaxWidth().vidrio(14).padding(13.dp)) {
+                                    Text(d.legible, fontSize = 13.sp, color = Cristal.texto,
+                                        fontWeight = FontWeight.Medium)
+                                    Text(
+                                        "device ${d.device} · modelo ${d.modelo}",
+                                        fontSize = 10.sp, color = Cristal.textoSuave,
+                                        fontFamily = FontFamily.Monospace,
+                                    )
+                                    if (p != null) {
+                                        Spacer(Modifier.height(8.dp))
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Boton("Usar", Cristal.violeta, Modifier.weight(1f)) {
+                                                onSeleccionarPerfil(p)
+                                            }
+                                            Boton("Guardar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                                onGuardarPerfil(p)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Fichas reales con SoC y GPU
+                    if (fichasMobolist.isNotEmpty()) {
+                        item { Etiqueta("FICHAS CON SoC Y GPU · ${fichasMobolist.size} MODELOS") }
+                        item {
+                            Text(
+                                "Modelos con su chip, su GPU y la versión de Android que " +
+                                    "declaran, de las fichas técnicas de mobolist.net. Aquí sí " +
+                                    "se puede calcular un OpenGL ES coherente, porque se sabe " +
+                                    "la GPU.",
+                                fontSize = 11.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
+                            )
+                        }
+                        item {
+                            CampoTexto(
+                                valor = consultaFicha,
+                                onCambio = { consultaFicha = it },
+                                pista = "spark 20c · helio g36 · adreno 610…",
+                            )
+                        }
+                        if (consultaFicha.isNotBlank()) {
+                            val halladas = Datos.buscarFichas(fichasMobolist, consultaFicha, 20)
+                            if (halladas.isEmpty()) {
+                                item {
+                                    Text("Ninguna ficha coincide con «$consultaFicha».",
+                                        fontSize = 12.sp, color = Cristal.ambar)
+                                }
+                            } else {
+                                items(halladas) { f ->
+                                    val perfil = Datos.perfilDeFicha(f)
+                                    Column(Modifier.fillMaxWidth().vidrio(14).padding(13.dp)) {
+                                        Text(f.nombre, fontSize = 13.sp, color = Cristal.texto,
+                                            fontWeight = FontWeight.Medium)
+                                        Text(f.resumen, fontSize = 10.sp, lineHeight = 15.sp,
+                                            color = Cristal.textoSuave)
+                                        if (perfil != null && perfil.openglEs.isNotBlank()) {
+                                            Text(
+                                                "OpenGL ES ${Generador.glLegible(perfil.openglEs)} " +
+                                                    "(${perfil.openglEs})",
+                                                fontSize = 9.sp, color = Cristal.verde,
+                                                fontFamily = FontFamily.Monospace,
+                                            )
+                                        }
+                                        if (perfil != null) {
+                                            Spacer(Modifier.height(8.dp))
+                                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Boton("Usar", Cristal.violeta, Modifier.weight(1f)) {
+                                                    onSeleccionarPerfil(perfil)
+                                                }
+                                                Boton("Guardar", Cristal.vidrioFuerte, Modifier.weight(1f)) {
+                                                    onGuardarPerfil(perfil)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── SoC y GPU reales
+                    if (socs.isNotEmpty()) {
+                        item { Etiqueta("SoC Y GPU · ${socs.size} FICHAS REALES") }
+                        item {
+                            CampoTexto(
+                                valor = consultaSoc,
+                                onCambio = { consultaSoc = it },
+                                pista = "adreno 610 · helio g36 · snapdragon 8 gen 3…",
+                            )
+                        }
+                        items(Datos.buscarSoc(socs, consultaSoc, 15)) { s ->
+                            Column(Modifier.fillMaxWidth().vidrio(14).padding(12.dp)) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(s.soc, fontSize = 12.sp, color = Cristal.texto,
+                                        fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                    Text(s.gpu, fontSize = 11.sp, color = Cristal.cian)
+                                }
+                                if (s.resumen.isNotBlank()) {
+                                    Text(s.resumen, fontSize = 10.sp, color = Cristal.textoSuave)
+                                }
+                                Datos.openglDe(s.gpu)?.let { n ->
+                                    Text(
+                                        "OpenGL ES para esta GPU: $n (${Generador.glLegible(n)})",
+                                        fontSize = 9.sp, color = Cristal.verde,
+                                        fontFamily = FontFamily.Monospace,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // ── Generar desde el aparato real
                     item { Etiqueta("GENERAR DESDE TU TELÉFONO") }
                     item {
@@ -557,6 +780,55 @@ fun PantallaPrincipal(
                     }
                 }
 
+                Seccion.RENDIMIENTO -> {
+                    item {
+                        Text(
+                            "Lo que hacen los módulos, sin root",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Cristal.texto,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Se leyeron las fichas de los 280 módulos de la categoría " +
+                                "AxManager Plugins para ver qué hacen, y se hizo lo que se " +
+                                "puede hacer con los permisos de `adb shell` —los mismos que " +
+                                "tiene Shizuku—. Cada tarjeta enseña el comando exacto, cómo " +
+                                "se comprueba y cómo se deshace.",
+                            fontSize = 12.sp, lineHeight = 18.sp, color = Cristal.textoSuave,
+                        )
+                    }
+                    item {
+                        Aviso(
+                            "Esto NO es lo mismo que un módulo con root. Lo que necesita root " +
+                                "está al final, dicho con su nombre: gobernadores de CPU, " +
+                                "Vulkan forzado, SurfaceFlinger, sondeo táctil. Aquí no hay un " +
+                                "botón que finja hacer eso.",
+                            Cristal.ambar,
+                        )
+                    }
+                    items(accionesRendimiento) { a ->
+                        TarjetaRendimiento(a, seleccion = null) { onRendimiento(a) }
+                    }
+                    item { Etiqueta("LO QUE NECESITA ROOT (Y AQUÍ NO ESTÁ)") }
+                    items(sinRootRendimiento) { (que, porQue) ->
+                        Column(Modifier.fillMaxWidth().vidrio(12).padding(12.dp)) {
+                            Text(que, fontSize = 12.sp, color = Cristal.texto,
+                                fontWeight = FontWeight.Medium)
+                            Text(porQue, fontSize = 10.sp, lineHeight = 15.sp,
+                                color = Cristal.textoSuave)
+                        }
+                    }
+                    item {
+                        Aviso(
+                            "Sobre los módulos de esa lista: muchos son buenos y otros piden " +
+                                "root para cosas que esta app no puede hacer. Ninguno se ha " +
+                                "copiado: no publican código, publican fichas. Lo que hay aquí " +
+                                "está escrito desde cero con comandos documentados de Android.",
+                            Cristal.cian,
+                        )
+                    }
+                }
+
                 Seccion.APLICADO -> {
                     item {
                         Aviso(
@@ -640,6 +912,17 @@ fun PantallaPrincipal(
                 }
 
                 Seccion.DIAGNOSTICO -> {
+                    manifiesto?.let { m ->
+                        item { Etiqueta("DATOS DENTRO DEL APK, CON SU FUENTE") }
+                        item {
+                            Text(
+                                m,
+                                fontSize = 11.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
+                                fontFamily = FontFamily.Monospace,
+                            )
+                        }
+                        item { Spacer(Modifier.height(6.dp)) }
+                    }
                     item { Etiqueta("ESTADO MEDIDO") }
                     items(lineasDiag) { l -> FilaDiag(l) }
                     item { Spacer(Modifier.height(6.dp)) }
@@ -1187,5 +1470,104 @@ private fun Fila(clave: String, valor: String) {
         Text(clave, fontSize = 11.sp, color = Cristal.textoSuave)
         Text(valor.ifBlank { "—" }, fontSize = 11.sp, color = Cristal.texto,
             fontFamily = FontFamily.Monospace)
+    }
+}
+
+/** Una posición del TOP500, de una edición concreta. Dato real, no simulado. */
+@Composable
+private fun FilaSistemaTop(s: Datos.Sistema) {
+    Column(Modifier.fillMaxWidth().vidrio(12).padding(11.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "${s.rank}",
+                fontSize = 12.sp, color = Cristal.cian, fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.width(34.dp),
+            )
+            Column(Modifier.weight(1f)) {
+                Text(s.nombre, fontSize = 12.sp, color = Cristal.texto,
+                    fontWeight = FontWeight.Medium, maxLines = 1)
+                Text(
+                    "${s.fabricante} · ${s.pais}",
+                    fontSize = 9.sp, color = Cristal.textoSuave, maxLines = 1,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    "${s.rmaxPflops ?: "—"} PFlop/s",
+                    fontSize = 11.sp, color = Cristal.violeta, fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "${s.nucleos} núcleos",
+                    fontSize = 9.sp, color = Cristal.textoSuave,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Una acción de rendimiento, con el comando a la vista ANTES de ejecutarla.
+ *
+ * El botón de aplicar está desactivado si la acción necesita un paquete y no hay ninguno
+ * elegido: es mejor que el botón diga «hace falta elegir una app» a que falle al pulsarlo.
+ */
+@Composable
+private fun TarjetaRendimiento(
+    a: Rendimiento.Accion,
+    seleccion: String?,
+    onAplicar: () -> Unit,
+) {
+    val color = when (a.riesgo) {
+        Rendimiento.Riesgo.BAJO -> Cristal.verde
+        Rendimiento.Riesgo.MEDIO -> Cristal.ambar
+        Rendimiento.Riesgo.ALTO -> Cristal.rojo
+    }
+    Column(Modifier.fillMaxWidth().vidrio(16).padding(14.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                a.nombre, fontSize = 14.sp, color = Cristal.texto,
+                fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f),
+            )
+            Text(
+                when (a.riesgo) {
+                    Rendimiento.Riesgo.BAJO -> "BAJO"
+                    Rendimiento.Riesgo.MEDIO -> "MEDIO"
+                    Rendimiento.Riesgo.ALTO -> "ALTO"
+                },
+                fontSize = 8.sp, letterSpacing = 0.8.sp, color = color,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(a.queHace, fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.textoSuave)
+        Spacer(Modifier.height(8.dp))
+        Text("COMANDO", fontSize = 8.sp, letterSpacing = 1.sp, color = Cristal.textoSuave)
+        Text(
+            a.comandosLegibles,
+            fontSize = 10.sp, color = Cristal.cian, fontFamily = FontFamily.Monospace,
+            lineHeight = 15.sp,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Comprueba: ${a.comprobar} → ${a.esperado}",
+            fontSize = 9.sp, color = Cristal.textoSuave, fontFamily = FontFamily.Monospace,
+        )
+        if (a.aviso.isNotBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(a.aviso, fontSize = 10.sp, lineHeight = 15.sp, color = color)
+        }
+        Text(
+            "De dónde salió la idea: ${a.inspirado}",
+            fontSize = 9.sp, color = Cristal.textoSuave,
+        )
+        Spacer(Modifier.height(9.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Boton("Aplicar", color, Modifier.weight(1f)) { onAplicar() }
+        }
+        Text(
+            Rendimiento.avisoDeRiesgo(a),
+            fontSize = 9.sp, color = Cristal.textoSuave,
+        )
     }
 }

@@ -61,6 +61,55 @@ eso puede funcionar en Huawei sin GMS). Verificado con Lint `NewApi` = 0, y con 
 pestaña **Compat.**, que prueba en tu propio teléfono cada función y te dice cuáles
 responden de verdad. Detalle: [COMPATIBILIDAD-ANDROID.md](COMPATIBILIDAD-ANDROID.md).
 
+## Los datos que viajan dentro (1.6.0)
+
+La app **no descarga nada**: los datos van en el APK. Son de terceros, con su fuente a la
+vista en la pantalla *Diagnóstico* y en `app/src/main/assets/datos/manifiesto.json`:
+
+| Bloque | Qué hay | Fuente |
+|---|---|---|
+| **TOP500** | 14 ediciones oficiales (2019-2025): **7.000 posiciones** con núcleos, Rmax, Rpeak, potencia y país — **más los 14 XML originales**, sin tocar | top500.org |
+| **Dispositivos** | **54.434** modelos del catálogo oficial de Google, con marca, `device` y modelo — **más el CSV original** | Google Play |
+| **Fichas** | **1.386** modelos con su SoC, su GPU y la versión de Android que declaran | mobolist.net |
+| **SoC / GPU** | 63 Snapdragon y 38 MediaTek con GPU, MHz y GFLOPS; **78 GPUs Adreno** con ALUs | Wikipedia |
+| **Android** | 28 versiones con su nivel de API | documentación de Android |
+
+De aquí salen perfiles que **existen de verdad**: tu propio TECNO BG7 está en el catálogo
+de Google (`Tecno · TECNO SPARK 20C · device TECNO-BG7 · model TECNO BG7`), y buscando
+`samsung s24` o `helio g36` sale su ficha con la GPU real.
+
+**Cuánto pesa, sin adornos.** Son 14,3 MB de datos; el ZIP del APK los comprime. Se
+publican **dos APK con exactamente el mismo contenido**:
+
+| APK | Pesa | Por qué |
+|---|---|---|
+| normal | **3,01 MB** | el ZIP comprime los datos a un 21% |
+| `-sin-comprimir` | **15,50 MB** | datos crudos dentro del ZIP: se abren sin descomprimir en el teléfono y se verifican con `unzip` |
+
+Para llegar a 15 MB **no se ha añadido ni un byte de relleno**: el contenido es idéntico.
+Se puede reproducir: `./gradlew :app:assembleRelease -PrebornDatos=crudo`.
+
+## Rendimiento: lo que hacen los módulos, sin root (1.6.0)
+
+Sección **Rendi.** Se leyeron las fichas de los **280 módulos** de la categoría
+*AxManager Plugins* de magiskmodule.com para ver **qué hace cada uno** (no se copia código
+ni diseño: ese sitio publica fichas, no código) y se implementó lo que se puede hacer con
+los permisos de `adb shell`, que son los que tiene esta app:
+
+- **Compilar una app por adelantado (AOT)** — `cmd package compile -m speed -f`
+- **Suspender una app** sin desinstalarla — `am suspend`
+- **Forzar Doze** ahora mismo — `dumpsys deviceidle force-idle`
+- **Modo juego** por app (Android 12+) — `cmd game set --mode performance`
+- **Modo de rendimiento fijo** — `cmd power set-fixed-performance-mode-enabled`
+- **Quitar el limitador térmico** (riesgo alto, revierte al reiniciar) — `cmd thermalservice`
+- **Que el WiFi no escanee sin parar** — `settings put global wifi_scan_throttle_enabled`
+- **Ahorro de batería forzado** — `settings put global low_power`
+
+Cada tarjeta enseña **el comando exacto antes de ejecutarlo**, **cómo se comprueba** y
+**cómo se deshace**. Y hay una lista al final, con nombre y motivo, de lo que esos módulos
+hacen y aquí **no** se puede: gobernadores de CPU, Vulkan forzado, SurfaceFlinger, sondeo
+táctil. Todo eso pide root; una app sin root que lo ofreciera estaría mintiendo.
+
 ## Aprender: buscar, extraer y generar perfiles (1.5.0)
 
 Sección **Aprender**. Tres cosas, y ninguna se inventa datos:
@@ -144,7 +193,7 @@ Sección **Útil**, todo a través de la shell de Shizuku — los mismos permiso
 
 De dónde salió cada idea y qué se descartó a propósito: [FUNCIONES.md](FUNCIONES.md).
 
-## Las nueve pantallas
+## Las diez pantallas
 
 - **Perfiles** — el estado real del teléfono arriba, el catálogo con su nivel de confianza,
   y *Aplicar* / *Restaurar*. Cada card dice si está VERIFICADO o PARCIAL y **qué falta**.
@@ -155,6 +204,8 @@ De dónde salió cada idea y qué se descartó a propósito: [FUNCIONES.md](FUNC
 - **Super** — diez fichas del TOP500, con los datos de la lista vigente. **Son simulación**:
   el teléfono *declara* llamarse LineShine; no tiene sus 13.789.440 núcleos. Va aquí y no
   en Perfiles para que nunca se confunda con un perfil de dispositivo.
+- **Rendi.** — las acciones que se pueden hacer con shell, con comando, comprobación y
+  reversión a la vista, y la lista de lo que sólo se puede con root.
 - **Aprender** — buscar en el catálogo, generar perfiles del aparato real (con su encaje
   y sus avisos) y extraerlos de un texto pegado.
 - **Útil** — resolución con reversión automática, refresco, congelar apps, borrar caché,
@@ -177,7 +228,17 @@ código son de aquí.
 El blur es de Compose (`Modifier.vidrio()`), no captura de pantalla: no cuesta batería
 extra y no depende de la versión de Android.
 
-## Si la app «no abre»
+## Si la app «no abre»: los dos fallos reales, arreglados
+
+**1)** En la 1.3.0 se preguntaba *una vez por app* si estaba congelada, desde el hilo de
+interfaz: con ~100 apps, Android mataba la app por ANR antes de pintar. **2)** En la 1.5.0
+el constructor de `Director` lanzaba `NullPointerException`: `modo` se inicializaba
+llamando a `cargarModo()`, que leía de `prefs`… declarado dos líneas **después**. Kotlin
+inicializa en orden de declaración, así que `prefs` era null. Ahora `prefs` va antes y
+además tiene su propio `try/catch`, y hay una **prueba que lee `Director.kt`** para que no
+vuelva a pasar.
+
+## Notas antiguas
 
 Pasó en un TECNO de 4 GB con la 1.3.0, y la causa era mía: al arrancar se preguntaba
 **una vez por app** si estaba congelada, en el hilo de interfaz, con 8 s de tope por
