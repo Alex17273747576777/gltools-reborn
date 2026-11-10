@@ -118,6 +118,28 @@ object Iconos {
             p
         }
 
+    /** Aspa, para lo que falla. */
+    @Composable
+    fun Aspa(modifier: Modifier = Modifier, tamano: Dp = 22.dp, color: Color = Cristal.texto) =
+        Trazo(modifier, tamano, color, relleno = false) { w, h ->
+            val p = Path()
+            p.moveTo(w * 0.22f, h * 0.22f)
+            p.lineTo(w * 0.78f, h * 0.78f)
+            p.moveTo(w * 0.78f, h * 0.22f)
+            p.lineTo(w * 0.22f, h * 0.78f)
+            p
+        }
+
+    /** Guion, para lo que no aplica: ni bien ni mal. */
+    @Composable
+    fun Guion(modifier: Modifier = Modifier, tamano: Dp = 22.dp, color: Color = Cristal.texto) =
+        Trazo(modifier, tamano, color, relleno = false) { w, h ->
+            val p = Path()
+            p.moveTo(w * 0.22f, h * 0.5f)
+            p.lineTo(w * 0.78f, h * 0.5f)
+            p
+        }
+
     /** Visto, para el banner verde. */
     @Composable
     fun Visto(modifier: Modifier = Modifier, tamano: Dp = 22.dp, color: Color = Cristal.texto) =

@@ -17,6 +17,25 @@ Cambiar el modelo es útil para que un juego aplique un preset gráfico en vez d
 terceros, no trae binarios ajenos. Ver [PROCEDENCIA.md](PROCEDENCIA.md) para el detalle
 de qué se tomó como referencia del proyecto original y qué se descartó, con nombre y motivo.
 
+## Normas de diseño
+
+La norma completa vive en el espacio de trabajo, fuera de este repo:
+`NORMAS-DE-DISENO.md`, con las habilidades en `habilidades/`. Este repositorio cumple la
+versión vigilada por pruebas.
+
+## Ley de diseño (1.7.1)
+
+**Prohibido que esta app parezca una página HTML**, genérica o «moderna». Está escrito en
+[REGLAS.md](REGLAS.md) y, sobre todo, **vigilado por 16 comprobaciones automáticas** que
+fallan si alguien vuelve a meter un icono de texto, si la tipografía pierde su escala, si
+no hay movimiento, si todo es vidrio o si un estado vacío dice «No hay datos».
+
+Comprobado por sabotaje: se metió un `◆` a propósito en `Home.kt` y la suite falló
+señalando la línea. Restaurado, verde.
+
+Cuando el diseño propio no esté a la altura: **se copia la estructura** de una app buena
+(ReDantotsu, Material 3 Expressive, iOS 26) y se refina. Nunca se justifica.
+
 ## Cómo está organizada la app (1.7.0)
 
 Cinco destinos abajo, y cada uno con sus subpestañas. Antes eran diez secciones en una

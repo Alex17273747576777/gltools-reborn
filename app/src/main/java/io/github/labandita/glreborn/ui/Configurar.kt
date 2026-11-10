@@ -334,7 +334,7 @@ object Configuracion {
         val disp = conEsCritura
         return listOf(
             FilaConfig(
-                "animaciones", "Escala de animaciones", "0.5× en las tres escalas del sistema",
+                "animaciones", "Escala de animaciones", "0.5x en las tres escalas del sistema",
                 "GENERAL", "Rendimiento", marcada = false, disponible = disp,
                 etiquetas = listOf(FilaConfig.Etiqueta.RENDIMIENTO),
             ),

@@ -3,6 +3,23 @@
 Máquina de compilación: JDK 21.0.13 · Gradle 8.11.1 · Android SDK platform 35 ·
 build-tools 35.0.0.
 
+## 1.7.1 · ley de diseño vigilada
+
+| Qué | Cómo | Resultado |
+|---|---|---|
+| Ningún icono es un carácter de texto | `pruebasNucleo`, sobre el fuente de `ui/` | **0 glifos** en literales de cadena |
+| La ley falla de verdad | meter `◆` en `Home.kt` a propósito | **falla**, señalando `Home.kt:81`; restaurado, verde |
+| Los iconos se dibujan | idem | ≥8 iconos con `Path`, `Stroke`, `StrokeCap.Round` |
+| Jerarquía tipográfica | idem | ≥6 tamaños distintos, con titulares ≥18sp y etiquetas ≤11sp |
+| Hay movimiento | idem | `spring(` + `animateFloatAsState` + `DampingRatio` |
+| El cristal es acento | idem | menos superficies de vidrio que textos |
+| Estados vacíos diseñados | idem | 0 «No hay datos» pelados |
+| Sin emojis como iconos | idem | 0 |
+| Iconos que faltaban | a mano | añadidos `Aspa` y `Guion`; sustituidos `✓ ✗ — ×` |
+| Suite completa | `gradle :app:pruebasNucleo` | **286 comprobaciones, 0 fallos** |
+| **La variante cruda de verdad lo es** | comparar tamaños de los dos APK | 3.176.147 B vs **16.181.251 B** (5,1×); prueba que falla si baja del triple |
+| Causa del fallo de la 1.7.0 | revisar `build.gradle` | el flag no invalidaba el empaquetado; arreglado con `packaging { useLegacyPackaging }` |
+
 ## 1.7.0 · estructura nueva
 
 | Qué | Cómo | Resultado |

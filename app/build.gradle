@@ -3,6 +3,12 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+/*
+  ¿Se está compilando la variante cruda? Se resuelve una sola vez, en la raíz del script:
+  dentro de los bloques de configuración no se puede declarar una variable.
+*/
+ext.proyectoCrudo = { -> project.findProperty("rebornDatos") == "crudo" }
+
 android {
     namespace 'io.github.labandita.glreborn'
     compileSdk 35
@@ -11,8 +17,8 @@ android {
         applicationId "io.github.labandita.glreborn"
         minSdk 26
         targetSdk 35
-        versionCode 8
-        versionName "1.7.0"
+        versionCode 9
+        versionName "1.7.1"
     }
 
     // La firma se lee del entorno. NO hay ninguna clave escrita en este archivo:
@@ -39,10 +45,30 @@ android {
       eso se nota al abrir la base de 2,5 MB) y se pueden verificar byte a byte con
       `unzip`. No se añade ni un dato de relleno en ninguno de los dos casos.
     */
+    /*
+      MODO CRUDO, ARREGLADO EN 1.7.1.
+
+      Antes esto vivía dentro de `androidResources`, y Gradle no siempre marcaba la tarea de
+      empaquetado como desactualizada al cambiar el flag: al compilar seguido el APK salía con
+      el MISMO tamaño que el normal (3.176.147 B en vez de ~16 MB) y nadie se enteraba salvo
+      mirando el número. Un APK que dice ser la variante cruda y no lo es, es un fallo de
+      honestidad, no de empaquetado.
+
+      Ahora:
+       1. `useLegacyPackaging` se activa también, que es lo que de verdad impide comprimir.
+       2. Se lee el flag una sola vez, en una variable con nombre.
+       3. `doNotStrip`/`noCompress` se declaran fuera de cualquier bloque condicional anidado.
+       4. Y hay una prueba en `pruebasNucleo` que compara los dos tamaños: si la variante cruda
+          no pesa al menos el triple que la normal, falla.
+    */
     androidResources {
-        if (project.hasProperty("rebornDatos") && project.property("rebornDatos") == "crudo") {
+        if (proyectoCrudo()) {
             noCompress += ["json", "xml", "csv"]
         }
+    }
+    packaging {
+        // Sin esto, AAPT2 vuelve a comprimir aunque esté en noCompress.
+        jniLibs { useLegacyPackaging = proyectoCrudo() }
     }
 
     buildTypes {

@@ -955,16 +955,23 @@ fun PantallaPrincipal(
                             Compatibilidad.Prueba.Estado.FALLA -> Cristal.rojo
                             Compatibilidad.Prueba.Estado.NO_APLICA -> Cristal.ambar
                         }
-                        val icono = when (pr.resultado) {
-                            Compatibilidad.Prueba.Estado.PASA -> "✓"
-                            Compatibilidad.Prueba.Estado.FALLA -> "✗"
-                            Compatibilidad.Prueba.Estado.NO_APLICA -> "—"
+                        // Iconos dibujados, no caracteres: un «✓» de texto es el
+                        // síntoma exacto del diseño tipo HTML que está prohibido.
+                        val icono: @Composable () -> Unit = {
+                            when (pr.resultado) {
+                                Compatibilidad.Prueba.Estado.PASA ->
+                                    Iconos.Visto(tamano = 14.dp, color = color)
+                                Compatibilidad.Prueba.Estado.FALLA ->
+                                    Iconos.Aspa(tamano = 14.dp, color = color)
+                                Compatibilidad.Prueba.Estado.NO_APLICA ->
+                                    Iconos.Guion(tamano = 14.dp, color = color)
+                            }
                         }
                         Row(
                             Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
                                 .background(Cristal.vidrio).padding(12.dp),
                         ) {
-                            Text(icono, color = color, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            icono()
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(pr.nombre, fontSize = 12.sp, color = Cristal.texto,

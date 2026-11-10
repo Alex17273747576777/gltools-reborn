@@ -914,6 +914,177 @@ run {
         )
     }
 
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  LEY DE DISEÑO (1.7.1)
+    //
+    //  Regla del usuario, textual: «prohibido que la app que creamos tenga diseño
+    //  parecido a HTML, ya sea genérico o moderno». No es una preferencia estética:
+    //  es una prohibición. Y para que no dependa de que alguien se acuerde, se
+    //  comprueba sola en cada compilación.
+    //
+    //  Qué se vigila, y por qué cada cosa:
+    //   · glifos de texto como iconos  → es EL síntoma de «esto es una página web»
+    //   · degradados en cada tarjeta   → decoración sin jerarquía
+    //   · vidrio en todas las cajas    → sin profundidad no hay interfaz
+    //   · cero movimiento              → nada responde al toque
+    //   · todos los botones iguales    → no se sabe qué es importante
+    // ══════════════════════════════════════════════════════════════════════════
+    println()
+    println("── ley de diseño: prohibido parecer HTML ──")
+
+    val uiDir = listOf(
+        "app/src/main/java/io/github/labandita/glreborn/ui",
+        "src/main/java/io/github/labandita/glreborn/ui",
+    ).map { java.io.File(it) }.firstOrNull { it.isDirectory }
+
+    if (uiDir == null) {
+        check("la carpeta de interfaz existe para poder vigilarla", false)
+    } else {
+        val fuentes = uiDir.listFiles { f -> f.extension == "kt" }!!.sortedBy { it.name }
+        check("hay ficheros de interfaz que revisar", fuentes.size >= 5, "${fuentes.size}")
+
+        // ── 1. Glifos de texto usados como iconos ──────────────────────────
+        // Se buscan SÓLO dentro de literales de cadena: un carácter suelto dibujado
+        // como texto es lo que delata a una página web.
+        val glifosProhibidos = listOf(
+            "◇", "◆", "✦", "✧", "▣", "▤", "◉", "◈", "◇", "◐", "▲", "●", "■", "□",
+            "↻", "✓", "✗", "×", "★", "☆", "➤", "≡", "⌂", "⚡",
+        )
+        val glifosEncontrados = mutableListOf<String>()
+        fuentes.forEach { f ->
+            val lineas = f.readLines()
+            lineas.forEachIndexed { n, linea ->
+                // Ignorar comentarios: en un comentario se puede hablar de glifos.
+                val limpia = linea.substringBefore("//")
+                if (!limpia.contains('"')) return@forEachIndexed
+                glifosProhibidos.forEach { g ->
+                    if (limpia.contains(g)) {
+                        glifosEncontrados += "${f.name}:${n + 1} «$g»"
+                    }
+                }
+            }
+        }
+        check(
+            "ningún icono es un carácter de texto (eso es lo que parece HTML)",
+            glifosEncontrados.isEmpty(),
+            glifosEncontrados.joinToString(" | "),
+        )
+
+        // ── 2. Los iconos están dibujados ──────────────────────────────────
+        val iconos = fuentes.firstOrNull { it.name == "Iconos.kt" }
+        check("existe Iconos.kt", iconos != null)
+        if (iconos != null) {
+            val txt = iconos.readText()
+            val cuantos = Regex("fun [A-Z][A-Za-z]+\\(").findAll(txt).count()
+            check("hay al menos 8 iconos dibujados", cuantos >= 8, "$cuantos")
+            check("se dibujan con Path", txt.contains("Path()"))
+            check("con trazo uniforme", txt.contains("Stroke("))
+            check(
+                "y esquinas redondeadas de verdad",
+                txt.contains("StrokeCap.Round") && txt.contains("StrokeJoin.Round"),
+            )
+        }
+
+        // ── 3. Jerarquía tipográfica: no todo el mismo tamaño ──────────────
+        val todos = fuentes.joinToString("\n") { it.readText() }
+        val tamanos = Regex("fontSize\\s*=\\s*([0-9.]+)\\.sp")
+            .findAll(todos).map { it.groupValues[1].toFloat() }.toSet()
+        check(
+            "la tipografía tiene escala, no un solo tamaño",
+            tamanos.size >= 6,
+            tamanos.sorted().toString(),
+        )
+        check("hay titulares grandes (≥18sp)", tamanos.any { it >= 18f })
+        check("y etiquetas pequeñas (≤11sp)", tamanos.any { it <= 11f })
+
+        // ── 4. Movimiento: algo responde y se mueve ────────────────────────
+        check(
+            "hay animación con física, no todo aparece de golpe",
+            todos.contains("spring(") && todos.contains("animateFloatAsState"),
+        )
+        check(
+            "el muelle usa damping (no es linear disfrazado)",
+            todos.contains("DampingRatio"),
+        )
+
+        // ── 5. El vidrio es acento, no el fondo de todo ────────────────────
+        // Si en Pantalla.kt hubiera más .vidrio que texto, sería todo cajas iguales.
+        val pantalla = fuentes.firstOrNull { it.name == "Pantalla.kt" }
+        if (pantalla != null) {
+            val txt = pantalla.readText()
+            val vidrios = Regex("\\.vidrio(Alto)?\\(").findAll(txt).count()
+            val textos = Regex("\\bText\\(").findAll(txt).count()
+            check(
+                "el cristal se usa como acento y no como única superficie",
+                vidrios < textos,
+                "vidrio=$vidrios texto=$textos",
+            )
+        }
+
+        // ── 6. Estados vacíos diseñados, no «No hay datos» a secas ─────────
+        val vacios = Regex("\"[^\"]{0,4}(No hay|Sin datos|Vacío|vacio)[^\"]{0,20}\"")
+            .findAll(todos).count()
+        check(
+            "ningún estado vacío es un «No hay datos» pelado",
+            vacios == 0,
+            "$vacios",
+        )
+
+        // ── 7. Botones con importancia, no todos iguales ───────────────────
+        check(
+            "existen al menos tres tratamientos de botón",
+            todos.contains("Boton(") && todos.contains("BotonHome(") &&
+                todos.contains("BotonPlano("),
+        )
+
+        // ── 8. Nada de emojis como iconos de interfaz ──────────────────────
+        val emojis = Regex("[\\uD83C-\\uDBFF][\\uDC00-\\uDFFF]").findAll(todos).count()
+        check("ningún emoji hace de icono", emojis == 0, "$emojis")
+    }
+
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  Las dos variantes de APK (1.7.1)
+    //
+    //  En 1.7.0 la variante «cruda» salió con el MISMO tamaño que la normal porque el
+    //  flag no invalidaba la tarea de empaquetado. Publicar un APK que dice ser crudo y
+    //  no lo es, es un fallo de honestidad, no de empaquetado. Esta prueba lo impide:
+    //  si los dos APK pesan parecido, algo se ha vuelto a romper.
+    // ══════════════════════════════════════════════════════════════════════════
+    println()
+    println("── las dos variantes de APK ──")
+    val normal = listOf(
+        "apk/GLTools-Reborn-1.7.1.apk", "apk/GLTools-Reborn-1.7.0.apk",
+        "../apk/GLTools-Reborn-1.7.1.apk",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    val crudo = listOf(
+        "apk/GLTools-Reborn-1.7.1-sin-comprimir.apk",
+        "apk/GLTools-Reborn-1.7.0-sin-comprimir.apk",
+        "../apk/GLTools-Reborn-1.7.1-sin-comprimir.apk",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (normal != null && crudo != null) {
+        val r = crudo.length().toDouble() / normal.length()
+        check(
+            "la variante cruda pesa al menos el triple que la normal",
+            r >= 3.0,
+            "normal=${normal.length()} crudo=${crudo.length()} ratio=%.1f".format(r),
+        )
+        check(
+            "y la normal sigue estando entre 2 y 6 MB",
+            normal.length() in 2_000_000..6_000_000,
+            "${normal.length()}",
+        )
+        check(
+            "y la cruda pasa de 10 MB (contenido real, sin relleno)",
+            crudo.length() > 10_000_000,
+            "${crudo.length()}",
+        )
+    } else {
+        check("los dos APK están disponibles para comparar", false,
+            "normal=$normal crudo=$crudo")
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")
