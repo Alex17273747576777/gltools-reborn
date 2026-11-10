@@ -20,19 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.labandita.glreborn.core.*
 
-enum class Seccion(val titulo: String, val icono: String) {
-    PERFILES("Perfiles", "◆"),
-    SUPER("Super", "▲"),
-    APLICACIONES("Apps", "▣"),
-    UTILIDADES("Útil", "✦"),
-    GPU("GPU", "◉"),
-    DIAGNOSTICO("Diag.", "◈"),
-    COMPATIBILIDAD("Compat.", "◇"),
-    APLICADO("Aplicado", "◐"),
-    APRENDER("Aprender", "✧"),
-    RENDIMIENTO("Rendi.", "⚡"),
-}
-
 @Composable
 fun PantallaPrincipal(
     director: Director,
@@ -89,8 +76,13 @@ fun PantallaPrincipal(
     onAplicar: () -> Unit,
     onRestaurar: () -> Unit,
     onRefrescar: () -> Unit,
+    banner: Banner,
+    puedeHacer: String,
+    avisosHome: List<Estado.Par>,
+    version: String,
 ) {
-    var seccion by remember { mutableStateOf(Seccion.PERFILES) }
+    var destino by remember { mutableStateOf(Destino.HOME) }
+    var pestana by remember { mutableStateOf<Pestana?>(null) }
 
     // Estado de la sección Aprender. Vive aquí, no dentro del LazyColumn: la lambda de
     // contenido de un LazyColumn no es @Composable y `remember` no compila ahí dentro.
@@ -101,33 +93,89 @@ fun PantallaPrincipal(
     var consultaCatalogo by remember { mutableStateOf("") }
     var consultaSoc by remember { mutableStateOf("") }
     var consultaFicha by remember { mutableStateOf("") }
+    var marcadas by remember { mutableStateOf(setOf<String>()) }
     val catalogoPerfiles = remember(biblioteca) {
         Distribuida.unir(Perfiles.todos, biblioteca)
     }
 
-    Scaffold(
-        containerColor = Cristal.fondoArriba,
-        topBar = {
-            Column(Modifier.fillMaxWidth().background(Cristal.fondoArriba).padding(20.dp, 18.dp, 20.dp, 0.dp)) {
-                Text("GLTOOLS REBORN", fontSize = 11.sp, letterSpacing = 2.sp,
-                    color = Cristal.verde, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                Text("Perfiles de dispositivo", style = MaterialTheme.typography.headlineMedium, color = Cristal.texto)
-                Spacer(Modifier.height(10.dp))
-                BarraEstado(estadoVia, director.descripcion())
-                Spacer(Modifier.height(10.dp))
-                BarraModo(modo, onModo)
-            }
-        },
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 116.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    Column(Modifier.fillMaxSize()) {
+        // Cabecera compacta: marca, modo y estado. El banner grande vive en Home.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .background(Cristal.fondoArriba)
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            when (seccion) {
-                Seccion.PERFILES -> {
+            Column {
+                Text(
+                    "GLTOOLS",
+                    fontSize = 10.sp, letterSpacing = 3.sp, color = Cristal.cian,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    when (destino) {
+                        Destino.HOME -> "REBORN"
+                        else -> destino.titulo.uppercase()
+                    },
+                    fontSize = 19.sp, letterSpacing = 0.5.sp, color = Cristal.texto,
+                    fontWeight = FontWeight.Light,
+                )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ChipModo(modo, onModo)
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Cristal.vidrio)
+                        .clickable { onRefrescar() }
+                        .padding(horizontal = 11.dp, vertical = 5.dp),
+                ) {
+                    Iconos.Refrescar(tamano = 15.dp, color = Cristal.textoSuave)
+                }
+            }
+        }
+
+        if (Navegacion.tienePestanas(destino)) {
+            FilaPestanas(destino, pestana, onPestana = { pestana = it })
+            Spacer(Modifier.height(10.dp))
+        }
+
+        Box(Modifier.weight(1f)) {
+        when (destino) {
+            Destino.HOME -> PantallaHome(
+                banner = banner,
+                puede = puedeHacer,
+                avisos = avisosHome,
+                perfilActivo = perfilActivo,
+                modo = modo,
+                actual = actual,
+                datosSonda = datosSonda,
+                resumenCompat = resumenCompat,
+                apps = apps.size,
+                congeladas = congeladas.size,
+                fichas = fichasMobolist.size,
+                ediciones = edicionesTop.size,
+                sistemas = edicionesTop.sumOf { it.sistemas },
+                acciones = accionesRendimiento.size,
+                version = version,
+                onIrA = { d, p ->
+                    destino = d
+                    pestana = p ?: Navegacion.inicial(d)
+                },
+                onAplicar = onAplicar,
+                onRestaurar = onRestaurar,
+                onModo = onModo,
+            )
+            else -> LazyColumn(
+                Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(18.dp, 4.dp, 18.dp, 120.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+            when (pestana) {
+                Pestana.CATALOGO, Pestana.APLICAR -> {
                     item { Etiqueta("EL TELÉFONO DICE AHORA") }
                     item { TablaActual(actual) }
                     item { Spacer(Modifier.height(6.dp)) }
@@ -154,7 +202,7 @@ fun PantallaPrincipal(
                     }
                 }
 
-                Seccion.SUPER -> {
+                Pestana.TOP500 -> {
                     item {
                         Aviso(
                             "SIMULACIÓN, no rendimiento. Estas fichas hacen que el teléfono DECLARE " +
@@ -238,7 +286,7 @@ fun PantallaPrincipal(
                     }
                 }
 
-                Seccion.UTILIDADES -> {
+                Pestana.PANTALLA, Pestana.RED -> {
                     item {
                         if (!hayShell) {
                             Aviso(
@@ -333,7 +381,7 @@ fun PantallaPrincipal(
                     }
                 }
 
-                Seccion.APLICACIONES -> {
+                Pestana.APPS -> {
                     item { Etiqueta("TODO LO INSTALADO, SIN FILTRO") }
                     item {
                         Aviso(
@@ -346,7 +394,7 @@ fun PantallaPrincipal(
                     items(apps) { a -> FilaApp(a) }
                 }
 
-                Seccion.GPU -> {
+                Pestana.LIMITES, Pestana.FUENTES, Pestana.DISPOSITIVOS, null -> {
                     item { Etiqueta("LO QUE DECLARA LA GPU") }
                     item { TablaFiltrada(actual, listOf("ro.opengles.version", "ro.hardware", "ro.board.platform", "ro.product.board")) }
                     item { Spacer(Modifier.height(6.dp)) }
@@ -378,7 +426,7 @@ fun PantallaPrincipal(
                     }
                 }
 
-                Seccion.APRENDER -> {
+                Pestana.GENERAR -> {
                     item {
                         Text(
                             "Buscar, extraer y generar",
@@ -780,7 +828,29 @@ fun PantallaPrincipal(
                     }
                 }
 
-                Seccion.RENDIMIENTO -> {
+                Pestana.CONFIGURAR -> {
+                    item {
+                        Text(
+                            Configuracion.resumen(
+                                Configuracion.filas(hayShell, sdkTelefono)
+                            ),
+                            fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.textoSuave,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        PantallaConfigurar(
+                            perfilActivo = perfilActivo,
+                            onIrAGenerar = { pestana = Pestana.GENERAR; destino = Destino.PERFILES },
+                            onIrAPerfiles = { pestana = Pestana.CATALOGO; destino = Destino.PERFILES },
+                            filas = Configuracion.filas(hayShell, sdkTelefono).map {
+                                it.copy(marcada = it.id in marcadas)
+                            },
+                            onAlternar = { id ->
+                                marcadas = if (id in marcadas) marcadas - id else marcadas + id
+                            },
+                        )
+                    }
+                }
+                Pestana.RENDIMIENTO -> {
                     item {
                         Text(
                             "Lo que hacen los módulos, sin root",
@@ -829,7 +899,7 @@ fun PantallaPrincipal(
                     }
                 }
 
-                Seccion.APLICADO -> {
+                Pestana.APLICADO -> {
                     item {
                         Aviso(
                             "Cada app tiene su propio panel con lo que se le aplicó y cuándo. " +
@@ -852,7 +922,7 @@ fun PantallaPrincipal(
                     }
                 }
 
-                Seccion.COMPATIBILIDAD -> {
+                Pestana.COMPATIBILIDAD -> {
                     item {
                         Aviso(
                             "Estas pruebas se ejecutan EN TU TELÉFONO, no en el mío: aquí no hay " +
@@ -911,7 +981,7 @@ fun PantallaPrincipal(
                     }
                 }
 
-                Seccion.DIAGNOSTICO -> {
+                Pestana.DIAGNOSTICO -> {
                     manifiesto?.let { m ->
                         item { Etiqueta("DATOS DENTRO DEL APK, CON SU FUENTE") }
                         item {
@@ -970,134 +1040,22 @@ fun PantallaPrincipal(
             }
             item { Spacer(Modifier.height(4.dp)) }
             item { Pie() }
-        }
-
-        // Píldora flotante: la navegación vive encima del contenido, no en una fila.
-        PildoraFlotante(
-            actual = seccion,
-            onSeccion = { seccion = it },
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
-        }
-    }
-}
-
-/**
- * Barra de navegación en píldora, flotando sobre el contenido.
- *
- * Es el gesto de iOS 26 / ReDantotsu: cristal translúcido, esquinas de píldora y la
- * sección activa marcada con una pastilla que se desliza. Solo caben las secciones sin
- * scroll horizontal: si algún día hay más de seis, esto tiene que cambiar a scroll.
- */
-@Composable
-private fun PildoraFlotante(
-    actual: Seccion,
-    onSeccion: (Seccion) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier
-            .padding(horizontal = 14.dp, vertical = 18.dp)
-            .fillMaxWidth()
-            .vidrioAlto(28)
-            .padding(horizontal = 5.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Seccion.entries.forEach { s ->
-            val sel = s == actual
-            Column(
-                Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(if (sel) Cristal.violeta.copy(alpha = 0.22f) else Color.Transparent)
-                    .clickable { onSeccion(s) }
-                    .padding(vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    s.icono,
-                    fontSize = 13.sp,
-                    color = if (sel) Cristal.violeta else Cristal.textoSuave,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    s.titulo,
-                    fontSize = 8.sp,
-                    letterSpacing = 0.2.sp,
-                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
-                    color = if (sel) Cristal.texto else Cristal.textoSuave,
-                    maxLines = 1,
-                )
             }
-        }
-    }
-}
+            } // cierra when (destino)
 
-/**
- * Se dibuja algo ANTES de tener datos.
- *
- * El arranque anterior esperaba a la shell antes de pintar nada: si la shell tardaba,
- * la pantalla se quedaba en negro y Android mataba la app. Este esqueleto se ve al
- * instante y no depende de Shizuku para nada.
- */
-@Composable
-fun PantallaArrancando(error: String? = null) {
-    Box(
-        Modifier.fillMaxSize().background(
-            Brush.verticalGradient(listOf(Cristal.fondoArriba, Cristal.fondoMedio, Cristal.fondoAbajo))
-        ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            Modifier.padding(36.dp).vidrio(26).padding(26.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                "GLTOOLS",
-                fontSize = 13.sp, letterSpacing = 5.sp, color = Cristal.cian,
-                fontWeight = FontWeight.Bold,
+            // Píldora de destinos: cinco, flotando sobre el contenido.
+            PildoraDestinos(
+                actual = destino,
+                onDestino = { d ->
+                    destino = d
+                    pestana = Navegacion.inicial(d)
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
             )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "REBORN",
-                fontSize = 30.sp, letterSpacing = 1.sp, color = Cristal.texto,
-                fontWeight = FontWeight.Light,
-            )
-            Spacer(Modifier.height(18.dp))
-            if (error == null) {
-                Text("Leyendo el teléfono…", fontSize = 12.sp, color = Cristal.textoSuave)
-            } else {
-                Text("Algo falló al arrancar", fontSize = 13.sp, color = Cristal.rojo,
-                    fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(8.dp))
-                Text(error, fontSize = 11.sp, color = Cristal.textoSuave, lineHeight = 17.sp)
-            }
-        }
+        } // Box del cuerpo
+        } // Column
     }
-}
 
-@Composable
-private fun Pestanas(actual: Seccion, onSeccion: (Seccion) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Seccion.entries.forEach { s ->
-            val sel = s == actual
-            Box(
-                Modifier.weight(1f).clip(RoundedCornerShape(8.dp))
-                    .background(if (sel) Cristal.verde else Cristal.vidrio)
-                    .clickable { onSeccion(s) }.padding(vertical = 9.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    s.titulo,
-                    fontSize = 11.sp,
-                    fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
-                    color = if (sel) Cristal.fondoArriba else Cristal.textoSuave,
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun BarraEstado(estado: Director.Estado, descripcion: String) {
@@ -1122,7 +1080,7 @@ private fun BarraEstado(estado: Director.Estado, descripcion: String) {
 }
 
 @Composable
-private fun Etiqueta(t: String) {
+internal fun Etiqueta(t: String) {
     Text(t, fontSize = 10.sp, letterSpacing = 1.6.sp, color = Cristal.textoSuave, fontWeight = FontWeight.Bold)
 }
 
@@ -1268,7 +1226,7 @@ private fun Boton(texto: String, color: Color, mod: Modifier, onClick: () -> Uni
 }
 
 @Composable
-private fun Pie() {
+internal fun Pie() {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Cristal.vidrio).padding(14.dp),
     ) {
@@ -1569,5 +1527,41 @@ private fun TarjetaRendimiento(
             Rendimiento.avisoDeRiesgo(a),
             fontSize = 9.sp, color = Cristal.textoSuave,
         )
+    }
+}
+
+@Composable
+fun PantallaArrancando(error: String? = null) {
+    Box(
+        Modifier.fillMaxSize().background(
+            Brush.verticalGradient(listOf(Cristal.fondoArriba, Cristal.fondoMedio, Cristal.fondoAbajo))
+        ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.padding(36.dp).vidrio(26).padding(26.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                "GLTOOLS",
+                fontSize = 13.sp, letterSpacing = 5.sp, color = Cristal.cian,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "REBORN",
+                fontSize = 30.sp, letterSpacing = 1.sp, color = Cristal.texto,
+                fontWeight = FontWeight.Light,
+            )
+            Spacer(Modifier.height(18.dp))
+            if (error == null) {
+                Text("Leyendo el teléfono…", fontSize = 12.sp, color = Cristal.textoSuave)
+            } else {
+                Text("Algo falló al arrancar", fontSize = 13.sp, color = Cristal.rojo,
+                    fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(8.dp))
+                Text(error, fontSize = 11.sp, color = Cristal.textoSuave, lineHeight = 17.sp)
+            }
+        }
     }
 }

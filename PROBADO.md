@@ -3,6 +3,28 @@
 Máquina de compilación: JDK 21.0.13 · Gradle 8.11.1 · Android SDK platform 35 ·
 build-tools 35.0.0.
 
+## 1.7.0 · estructura nueva
+
+| Qué | Cómo | Resultado |
+|---|---|---|
+| Navegación de cinco destinos | `gradle :app:pruebasNucleo` | **12 comprobaciones**: ninguna sección de la 1.6.0 se perdió |
+| Banner que no miente | idem | verde con root/Shizuku, ámbar sin permiso, **rojo sin vía**; nunca dice «mejor modo posible» |
+| Avisos de Home | idem | sin problemas **no hay avisos** (lista vacía comprobada) |
+| Pantalla Configurar | idem | 4 grupos, ids únicos, nada marcado de fábrica, toda fila no disponible explicada |
+| Sin `LazyColumn` anidado | idem, sobre el fuente | vigila el fallo que cerraría la app al abrir Configurar |
+| Iconos vectoriales | idem, sobre el fuente | se dibujan con `Path`/`Stroke`; no quedan glifos |
+| Suite completa | `gradle :app:pruebasNucleo` | **267 comprobaciones, 0 fallos** |
+| Lint | `gradle :app:lintDebug` | 0 errores |
+| APK normal | `assembleRelease` | **3.176.147 B (3,03 MB)** |
+| APK sin comprimir | `-PrebornDatos=crudo` | **16.226.163 B (15,48 MB)** |
+| El código nuevo va dentro | `strings` sobre los `.dex` del APK | aparece el texto de Configurar |
+| Firma | `apksigner verify --print-certs` | SHA-256 `1ff4c6ee…c6c9e803` (la misma) |
+
+**Lo que no está probado en 1.7.0, y se dice:** la app **no se ha instalado en un teléfono
+físico** desde esta máquina (no hay `/dev/kvm` ni dispositivo conectado). Las pantallas
+nuevas compilan, pasan las pruebas de estructura y están dentro del APK, pero **el aspecto
+final en el TECNO BG7 no lo he visto yo**: eso lo tiene que decir la primera instalación.
+
 ## Probado de verdad
 
 | Qué | Cómo | Resultado |

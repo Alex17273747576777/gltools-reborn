@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  La marca: una pica (espada) con degradado violeta→cian y un destello.
+  Dibujada como vector para que se vea nítida en cualquier densidad y en el
+  recorte adaptativo de Android 8+, sin PNGs de cinco tamaños.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Escudo de fondo suave -->
+    <path
+        android:pathData="M54,20 L82,34 L82,56 C82,72 69,82 54,88 C39,82 26,72 26,56 L26,34 Z"
+        android:strokeWidth="2.2"
+        android:strokeAlpha="0.35">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="26" android:startY="20"
+                android:endX="82" android:endY="88">
+                <item android:offset="0" android:color="#FF9D7BFF"/>
+                <item android:offset="1" android:color="#FF5CE1E6"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Hoja de la pica -->
+    <path android:pathData="M54,26 C40,40 38,54 46,60 C44,66 48,70 54,68 C60,70 64,66 62,60 C70,54 68,40 54,26 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="54" android:startY="26"
+                android:endX="54" android:endY="69">
+                <item android:offset="0" android:color="#FFBFD8FF"/>
+                <item android:offset="0.5" android:color="#FF9D7BFF"/>
+                <item android:offset="1" android:color="#FF5CE1E6"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Mango -->
+    <path android:pathData="M51,68 h6 v10 h-6 z" >
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="51" android:startY="68"
+                android:endX="57" android:endY="78">
+                <item android:offset="0" android:color="#FF5CE1E6"/>
+                <item android:offset="1" android:color="#FF3FA7B3"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

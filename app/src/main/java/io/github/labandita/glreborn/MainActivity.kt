@@ -24,6 +24,8 @@ import io.github.labandita.glreborn.ui.Cristal
 import io.github.labandita.glreborn.ui.PanelApp
 import androidx.compose.ui.text.font.FontWeight
 import io.github.labandita.glreborn.core.*
+import io.github.labandita.glreborn.ui.Banner
+import io.github.labandita.glreborn.ui.Estado
 import io.github.labandita.glreborn.ui.PantallaPrincipal
 import io.github.labandita.glreborn.ui.TemaReborn
 import rikka.shizuku.Shizuku
@@ -423,6 +425,31 @@ private fun App(
             releer()
             alcance.launch { releerShell() }
         },
+        banner = Estado.banner(
+            conRoot = estado == Director.Estado.ROOT_LISTO,
+            conShizuku = estado == Director.Estado.SHIZUKU_LISTO ||
+                estado == Director.Estado.SHIZUKU_SIN_PERMISO,
+            conPermiso = estado == Director.Estado.SHIZUKU_LISTO ||
+                estado == Director.Estado.ROOT_LISTO,
+            modo = modo,
+        ),
+        puedeHacer = Estado.puede(
+            conRoot = estado == Director.Estado.ROOT_LISTO,
+            conShizuku = estado == Director.Estado.SHIZUKU_LISTO ||
+                estado == Director.Estado.SHIZUKU_SIN_PERMISO,
+            conPermiso = estado == Director.Estado.SHIZUKU_LISTO ||
+                estado == Director.Estado.ROOT_LISTO,
+        ),
+        avisosHome = Estado.avisos(
+            conVia = estado == Director.Estado.SHIZUKU_LISTO ||
+                estado == Director.Estado.ROOT_LISTO,
+            modo = modo,
+            resumenCompat = resumenCompat,
+            tienePerfil = perfil != null,
+            irreversibleAplicado = false,
+            sinApps = apps.isEmpty(),
+        ),
+        version = "1.7.0",
     )
 }
 

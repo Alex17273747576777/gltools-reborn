@@ -6,6 +6,13 @@
  * Android y se puede probar aquí de verdad. Lo que NO se prueba aquí se dice al final.
  */
 import io.github.labandita.glreborn.core.*
+import io.github.labandita.glreborn.ui.Banner
+import io.github.labandita.glreborn.ui.Configuracion
+import io.github.labandita.glreborn.ui.Destino
+import io.github.labandita.glreborn.ui.Estado
+import io.github.labandita.glreborn.ui.FilaConfig
+import io.github.labandita.glreborn.ui.Navegacion
+import io.github.labandita.glreborn.ui.Pestana
 
 var fallos = 0
 fun check(nombre: String, cond: Boolean, detalle: String = "") {
@@ -720,6 +727,192 @@ run {
         }
     }
 }
+
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  Estructura de navegación (1.7.0)
+    //
+    //  La app pasó de diez secciones planas a cinco destinos con subpestañas. Estas
+    //  pruebas vigilan que el cambio no pierda ninguna sección por el camino: si una
+    //  desaparece, esto falla en vez de que el usuario descubra que falta una pantalla.
+    // ══════════════════════════════════════════════════════════════════════════
+    println()
+    println("── estructura de navegación ──")
+
+    check("hay cinco destinos", Destino.entries.size == 5, "${Destino.entries.size}")
+    check("el primero es Home", Destino.entries.first() == Destino.HOME)
+    check(
+        "ningún destino se queda sin subpestañas salvo Home",
+        Destino.entries.filter { it != Destino.HOME }.all { Navegacion.pestanas(it).isNotEmpty() },
+    )
+    check("Home no tiene subpestañas", Navegacion.pestanas(Destino.HOME).isEmpty())
+    check("ninguna píldora pasa de cinco", Destino.entries.size <= 5)
+    check(
+        "Perfiles tiene catálogo, aplicar y generar",
+        Navegacion.pestanas(Destino.PERFILES).map { it.titulo } ==
+            listOf("Catálogo", "Aplicar", "Generar"),
+        Navegacion.pestanas(Destino.PERFILES).joinToString { it.titulo },
+    )
+    check(
+        "Herramientas lleva configurar y las acciones de rendimiento",
+        Navegacion.pestanas(Destino.HERRAMIENTAS).contains(Pestana.CONFIGURAR) &&
+            Navegacion.pestanas(Destino.HERRAMIENTAS).contains(Pestana.RENDIMIENTO),
+    )
+    check(
+        "Datos conserva TOP500, aplicado y dispositivos",
+        Navegacion.pestanas(Destino.DATOS) ==
+            listOf(Pestana.TOP500, Pestana.APLICADO, Pestana.DISPOSITIVOS),
+    )
+    check(
+        "Ayuda conserva compatibilidad, diagnóstico, límites y fuentes",
+        Navegacion.pestanas(Destino.AYUDA) ==
+            listOf(Pestana.COMPATIBILIDAD, Pestana.DIAGNOSTICO, Pestana.LIMITES, Pestana.FUENTES),
+    )
+    // Las diez secciones antiguas tienen que tener destino: ninguna se perdió.
+    val antiguas = listOf(
+        "Perfiles", "Super", "Aplicaciones", "Útil", "GPU", "Diag.",
+        "Compat.", "Aplicado", "Aprender", "Rendi.",
+    )
+    check(
+        "las diez secciones de la 1.6.0 siguen teniendo sitio",
+        antiguas.all { Navegacion.mapaDesdeLaVersionAnterior.containsKey(it) },
+        antiguas.filterNot { Navegacion.mapaDesdeLaVersionAnterior.containsKey(it) }.toString(),
+    )
+    check(
+        "cada pestaña pertenece a un destino válido",
+        Pestana.entries.all { Navegacion.destinoDe(it) == it.destino },
+    )
+    check(
+        "inicial() nunca devuelve una pestaña de otro destino",
+        Destino.entries.all { d -> Navegacion.inicial(d)?.let { it.destino == d } ?: true },
+    )
+
+    // ── El banner de estado dice la verdad ──
+    println()
+    println("── banner de estado ──")
+    val conRoot = Estado.banner(conRoot = true, conShizuku = false, conPermiso = true, modo = Modo.SEGURO)
+    check("con root el banner está en verde", conRoot.esBueno && conRoot.tono == Banner.Tono.BIEN)
+    check("y dice «root», no «mejor modo posible»", conRoot.titulo.contains("root", true))
+    val shizuku = Estado.banner(conRoot = false, conShizuku = true, conPermiso = true, modo = Modo.SEGURO)
+    check("con Shizuku el banner también está en verde", shizuku.tono == Banner.Tono.BIEN)
+    check(
+        "pero aclara que no es root",
+        shizuku.detalle.contains("No es root"),
+        shizuku.detalle,
+    )
+    val sinPermiso = Estado.banner(conRoot = false, conShizuku = true, conPermiso = false, modo = Modo.SEGURO)
+    check("sin permiso de Shizuku es ámbar, no verde", sinPermiso.tono == Banner.Tono.AVISO)
+    val sinVia = Estado.banner(conRoot = false, conShizuku = false, conPermiso = false, modo = Modo.SEGURO)
+    check("sin vía es rojo", sinVia.tono == Banner.Tono.MAL)
+    check("y no finge que se puede escribir", sinVia.detalle.contains("no va a", true), sinVia.detalle)
+    check(
+        "nunca dice «el mejor modo posible»",
+        listOf(conRoot, shizuku, sinPermiso, sinVia).none {
+            it.detalle.contains("mejor modo", true) || it.titulo.contains("mejor modo", true)
+        },
+    )
+    check(
+        "sin vía, «puede» sólo promete leer",
+        Estado.puede(conRoot = false, conShizuku = false, conPermiso = false).contains("NO puede escribir"),
+    )
+    check(
+        "con vía, «puede» sí promete escribir",
+        Estado.puede(conRoot = true, conShizuku = false, conPermiso = true).contains("Puede: aplicar"),
+    )
+
+    // ── Avisos del Home: sólo cuando hay algo que decir ──
+    check(
+        "sin problemas no hay avisos (nada de relleno)",
+        Estado.avisos(
+            conVia = true, modo = Modo.SEGURO, resumenCompat = "todo responde",
+            tienePerfil = true, irreversibleAplicado = false, sinApps = false,
+        ).isEmpty(),
+    )
+    check(
+        "sin vía sí hay aviso y es rojo",
+        Estado.avisos(
+            conVia = false, modo = Modo.SEGURO, resumenCompat = "todo responde",
+            tienePerfil = true, irreversibleAplicado = false, sinApps = false,
+        ).any { it.tono == Banner.Tono.MAL },
+    )
+    check(
+        "cada aviso trae qué hacer, no sólo el problema",
+        Estado.avisos(
+            conVia = false, modo = Modo.EXPERTO, resumenCompat = "",
+            tienePerfil = false, irreversibleAplicado = true, sinApps = true,
+        ).all { it.detalle.length > 20 },
+    )
+
+    // ── Configuración: lo que se puede y lo que no ──
+    println()
+    println("── pantalla Configurar ──")
+    val sinShell = Configuracion.filas(conEsCritura = false, sdk = 33)
+    val conShell = Configuracion.filas(conEsCritura = true, sdk = 33)
+    check("sin shell no hay ninguna fila disponible", sinShell.none { it.disponible })
+    check("con shell sí hay filas disponibles", conShell.count { it.disponible } >= 8)
+    check(
+        "las que necesitan root están marcadas como tal",
+        conShell.filterNot { it.disponible }.all {
+            it.etiquetas.contains(FilaConfig.Etiqueta.NECESITA_ROOT)
+        },
+    )
+    check(
+        "toda fila no disponible se explica en su detalle",
+        conShell.filterNot { it.disponible }.all { it.detalle.length > 30 },
+    )
+    check(
+        "los cuatro grupos del original existen",
+        conShell.map { it.grupo }.distinct().sorted() ==
+            listOf("GENERAL", "IMAGEN", "OPENGL", "VULKAN"),
+    )
+    check("todas las filas tienen id único", conShell.map { it.id }.distinct().size == conShell.size)
+    check(
+        "ninguna fila viene marcada de fábrica",
+        conShell.none { it.marcada },
+    )
+    check(
+        "el resumen dice cuántas necesitan root",
+        Configuracion.resumen(conShell).contains("necesitan root"),
+        Configuracion.resumen(conShell),
+    )
+    check(
+        "la versión de OpenGL ES depende del API del teléfono",
+        Configuracion.filas(true, 26).first { it.id == "gl_version" }.detalle.contains("26") &&
+            Configuracion.filas(true, 33).first { it.id == "gl_version" }.detalle.contains("33"),
+    )
+
+    // ── Iconos: son vectores, no glifos escritos ──
+    // Un LazyColumn dentro de otro LazyColumn revienta al medir: es cierre de app
+    // garantizado. La pantalla Configurar se pinta dentro del LazyColumn principal, así
+    // que no puede traer el suyo. Esta prueba lo vigila en el código fuente.
+    val fuenteConfig = listOf(
+        "app/src/main/java/io/github/labandita/glreborn/ui/Configurar.kt",
+        "src/main/java/io/github/labandita/glreborn/ui/Configurar.kt",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (fuenteConfig != null) {
+        val texto = fuenteConfig.readText()
+        check(
+            "Configurar no anida un LazyColumn (cerraría la app al medir)",
+            !texto.contains("LazyColumn("),
+        )
+        check("Configurar usa Column y deja desplazar al de fuera", texto.contains("Column("))
+    }
+
+    println()
+    println("── iconos ──")
+    val fuenteIconos = listOf(
+        "app/src/main/java/io/github/labandita/glreborn/ui/Iconos.kt",
+        "src/main/java/io/github/labandita/glreborn/ui/Iconos.kt",
+    ).map { java.io.File(it) }.firstOrNull { it.exists() }
+    if (fuenteIconos != null) {
+        val texto = fuenteIconos.readText()
+        check("los iconos se dibujan con Path", texto.contains("Path()"))
+        check("y usan un trazo uniforme", texto.contains("Stroke("))
+        check(
+            "ya no hay glifos de fuente en la navegación",
+            !texto.contains("\"◇\"") && !texto.contains("\"✦\""),
+        )
+    }
 
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")

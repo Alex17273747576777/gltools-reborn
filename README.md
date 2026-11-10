@@ -17,6 +17,38 @@ Cambiar el modelo es útil para que un juego aplique un preset gráfico en vez d
 terceros, no trae binarios ajenos. Ver [PROCEDENCIA.md](PROCEDENCIA.md) para el detalle
 de qué se tomó como referencia del proyecto original y qué se descartó, con nombre y motivo.
 
+## Cómo está organizada la app (1.7.0)
+
+Cinco destinos abajo, y cada uno con sus subpestañas. Antes eran diez secciones en una
+misma píldora: cabían de milagro y no había jerarquía; además, lo primero que se abría era
+un catálogo de perfiles, no un resumen de lo que estaba pasando.
+
+| Destino | Subpestañas | Qué hay dentro |
+|---|---|---|
+| **Home** | — | Estado real, perfil en uso, lo que dice el teléfono, cifras de los datos |
+| **Perfiles** | Catálogo · Aplicar · Generar | Elegir perfil, generar uno, buscar fichas |
+| **Herramientas** | Configurar · Rendimiento · Apps · Pantalla · Red | Las 8 acciones sin root, la configuración por grupos, apps, pantalla, DNS |
+| **Datos** | TOP500 · Aplicado · Dispositivos | Catálogo Google, qué se aplicó por app, catálogo de dispositivos |
+| **Ayuda** | Compat. · Diagnóstico · Límites · Fuentes | Qué responde en TU teléfono, diagnóstico, lo que no se puede, de dónde sale cada dato |
+
+**Home** es el resumen. Su cartel grande de estado tiene la misma función que el «Rooted
+mode» verde del GLTools original —lo primero que ves al abrir— pero dice lo que hay de
+verdad: verde si Shizuku está activo y con permiso o si hay `su`, ámbar si Shizuku no
+autorizó, y **rojo si no hay vía**. Nunca escribe «el mejor modo posible»: con Shizuku no
+hay root, y el propio cartel lo aclara.
+
+**Configurar** reproduce la estructura del «Configuration» del original: pestañas en
+mayúsculas (GENERAL · OPENGL · VULKAN · IMAGEN), grupos rotulados, y cada fila con sus
+etiquetas de consecuencia. La diferencia es que aquí **las opciones que necesitan root
+salen en gris y explicadas**, en vez de encendidas sin avisar. De 16 filas, las que se
+pueden tocar de verdad dependen de si hay shell; las demás dicen «Necesita root».
+
+Los iconos de la navegación están **dibujados con `Path`** (casa, llave, rayo, base de
+datos, interrogación, visto, pico), con el mismo grosor de trazo y el mismo tamaño óptico.
+No son caracteres de tipografía: eso era lo que hacía que la app pareciera una página web.
+El icono de lanzador es adaptativo y vectorial (`mipmap-anydpi-v26`), con recorte
+`monochrome` para Android 13.
+
 ## Con qué gestor funciona
 
 **Shizuku (Rikka) y OmniShizuku, sin cambiar nada.** Comprobado: los dos declaran el
