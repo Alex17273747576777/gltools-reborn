@@ -2017,7 +2017,6 @@ run {
         // Lo que se vio en un teléfono: «Failed to set property 'persist.reborn.prueba'» y
         // «Modo rendimiento (cmd): Power manager (power) commands: help …».
         val cpd = io.github.labandita.glreborn.core.Compatibilidad
-        val est = io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado
         val cpi = io.github.labandita.glreborn.core.Compatibilidad(io.github.labandita.glreborn.shizuku.Shell())
         check("debug.* lo puede escribir la vía ADB", cpd.escribibleSinRoot("debug.reborn.prueba"))
         check("persist.debug.* también", cpd.escribibleSinRoot("persist.debug.algo"))
@@ -2028,23 +2027,23 @@ run {
 
         val w = "Escribir y deshacer una propiedad"
         check("escritura leída de vuelta: pasa",
-            cpi.juzgarEscritura(w, "debug.reborn.prueba", 0, "", "1").resultado == est.PASA)
+            cpi.juzgarEscritura(w, "debug.reborn.prueba", 0, "", "1").resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.PASA)
         check("sin gestor: falla y lo dice",
-            cpi.juzgarEscritura(w, "debug.reborn.prueba", null, "", "").let { it.resultado == est.FALLA && it.detalle.contains("sin respuesta") })
+            cpi.juzgarEscritura(w, "debug.reborn.prueba", null, "", "").let { it.resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.FALLA && it.detalle.contains("sin respuesta") })
         val rechazo = cpi.juzgarEscritura(w, "debug.reborn.prueba", 1,
             "Failed to set property 'debug.reborn.prueba' to '1'. See dmesg for error reason.", "")
         check("rechazo de Android: falla, nombra la propiedad y no dice «sonó bien»",
-            rechazo.resultado == est.FALLA && rechazo.detalle.contains("debug.reborn.prueba") && !rechazo.detalle.contains("sonó bien"))
-        check("otro valor al leer: falla", cpi.juzgarEscritura(w, "debug.reborn.prueba", 0, "", "7").resultado == est.FALLA)
+            rechazo.resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.FALLA && rechazo.detalle.contains("debug.reborn.prueba") && !rechazo.detalle.contains("sonó bien"))
+        check("otro valor al leer: falla", cpi.juzgarEscritura(w, "debug.reborn.prueba", 0, "", "7").resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.FALLA)
 
-        check("modo fijo aceptado (código 0): pasa", cpi.juzgarModoFijo(34, 0, "").resultado == est.PASA)
+        check("modo fijo aceptado (código 0): pasa", cpi.juzgarModoFijo(34, 0, "").resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.PASA)
         val sinHal = cpi.juzgarModoFijo(33, 255,
             "Failed to set FIXED_PERFORMANCE mode\nThis is likely because Power HAL AIDL is not implemented on this device")
         check("sin HAL: falla y dice que el teléfono no lo implementa",
-            sinHal.resultado == est.FALLA && sinHal.detalle.contains("no implementa"))
+            sinHal.resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.FALLA && sinHal.detalle.contains("no implementa"))
         check("Android 10 no tiene la orden: no aplica, sin ejecutar nada",
-            cpi.juzgarModoFijo(29, null, "").resultado == est.NO_APLICA)
-        check("sin gestor en Android 11+: falla", cpi.juzgarModoFijo(30, null, "").resultado == est.FALLA)
+            cpi.juzgarModoFijo(29, null, "").resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.NO_APLICA)
+        check("sin gestor en Android 11+: falla", cpi.juzgarModoFijo(30, null, "").resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.FALLA)
         // La salida exacta que se vio en el teléfono, con el código que `help` devuelve siempre.
         val ayuda = cpi.juzgarModoFijo(34, 255, "Power manager (power) commands:\n  help\n    Print this help text.")
         check("la ayuda de `cmd power` ya no se lee como «el servicio no responde»",
@@ -2054,20 +2053,20 @@ run {
         val minima = "Power manager (power) commands:\n  help\n    Print this help text."
         val completa = minima + "\n  set-fixed-performance-mode-enabled [true|false]"
         check("ayuda mínima con 255 no es un servicio detenido",
-            cpi.juzgarAyudaModoFijo(34, 255, minima).resultado == est.NO_APLICA)
+            cpi.juzgarAyudaModoFijo(34, 255, minima).resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.NO_APLICA)
         check("ayuda con setter y 255 anuncia capacidad sin cambiar el modo",
             cpi.juzgarAyudaModoFijo(34, 255, completa).let {
-                it.resultado == est.PASA && it.detalle.contains("NO VERIFICADOS") })
+                it.resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.PASA && it.detalle.contains("NO VERIFICADOS") })
         check("ayuda con setter y 0 también se admite",
-            cpi.juzgarAyudaModoFijo(34, 0, completa).resultado == est.PASA)
+            cpi.juzgarAyudaModoFijo(34, 0, completa).resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.PASA)
         check("permiso denegado no se confunde con falta de soporte",
-            cpi.juzgarAyudaModoFijo(34, 1, "Permission denied").resultado == est.FALLA)
+            cpi.juzgarAyudaModoFijo(34, 1, "Permission denied").resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.FALLA)
         check("sin respuesta no se inventa diagnóstico del daemon",
-            cpi.juzgarAyudaModoFijo(34, null, "").resultado == est.FALLA)
+            cpi.juzgarAyudaModoFijo(34, null, "").resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.FALLA)
         check("API 29 no ofrece modo fijo",
-            cpi.juzgarAyudaModoFijo(29, null, "").resultado == est.NO_APLICA)
+            cpi.juzgarAyudaModoFijo(29, null, "").resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.NO_APLICA)
         check("help con código cero no confirma un setter",
-            cpi.juzgarModoFijo(34, 0, minima).resultado == est.NO_APLICA)
+            cpi.juzgarModoFijo(34, 0, minima).resultado == io.github.labandita.glreborn.core.Compatibilidad.Prueba.Estado.NO_APLICA)
         check("penetración: la escritura de propiedades prueba una clave escribible",
             rpen.PRUEBAS.none { it.second.contains("setprop persist.reborn") })
         val rfijo = io.github.labandita.glreborn.core.Rendimiento.catalogo.first { it.id == "rendimiento-fijo" }
