@@ -3,6 +3,24 @@
 Máquina de compilación: JDK 21.0.13 · Gradle 8.11.1 · Android SDK platform 35 ·
 build-tools 35.0.0.
 
+## 1.9.1 · tipografía propia, censo completo y procedimientos
+
+| Qué | Cómo | Resultado |
+|---|---|---|
+| La app ya no usa la fuente del sistema | `pruebasNucleo`, sobre `Tema.kt` | `FontFamily(` + `R.font.` + escala de ≥6 pasos, ninguno por debajo de 10 sp |
+| Las fuentes viajan en el APK | `unzip -l` del APK **descargado de la release** | `res/GL.ttf`, `res/Qd.ttf`, `res/f6.ttf`, `res/xp.ttf` + `assets/OFL-AtkinsonNext.txt` |
+| La licencia permite usarla | idem, sobre el asset | SIL Open Font License 1.1 dentro del APK |
+| Los procedimientos existen | idem | los 5 ficheros de `procedimientos/` presentes |
+| **El script de cierre se ejecutó de verdad** | `03-cerrar-tramo.sh 1.9.1` | 3 intentos: encontró **2 fallos suyos** (`head -1` con `pipefail`, sumas antes de borrar los APK viejos) y un tercero limpio |
+| Censo del catálogo | `01-censar-catalogo-appteka.py` | **42 categorías · 36.540 apps de código abierto** |
+| Incidencias abiertas | `04-incidencias.sh` | 5 en este repositorio, 2 en el de normas |
+| Suite completa | `gradle :app:pruebasNucleo` | **348 comprobaciones, 0 fallos** (contadas en el log) |
+
+**Lo que NO está probado en 1.9.1, y se dice:** la tipografía nueva **no se ha visto en una
+pantalla**. Compila, viaja dentro del APK y las pruebas comprueban que está declarada, pero si a
+720×1612 se lee bien, se aprieta o se sale de los botones **sólo se sabe instalándolo**. Es la
+incidencia #2 de este repositorio.
+
 ## 1.9.0 · la Home copiada de quien lo hace bien
 
 Encargo: mirar apps de **Tools** y **Root & System** de `appteka.store`, aprender de su código y
