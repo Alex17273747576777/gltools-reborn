@@ -1601,6 +1601,28 @@ run {
         }
     }
 
+
+    // ── 1.9.7: la sección de la mira explicaba los ajustes pero no el uso ────
+    //
+    // El pendiente número uno de la app, en palabras del propio usuario: «vale, lo activo…
+    // ¿y ahora qué?». Una función que no se sabe usar es una función que no existe.
+    println()
+    println("── una función que se sabe usar ──")
+    run {
+        val sup = listOf(
+            "app/src/main/java/io/github/labandita/glreborn/ui/Superposicion.kt",
+            "src/main/java/io/github/labandita/glreborn/ui/Superposicion.kt",
+        ).map { java.io.File(it) }.firstOrNull { it.exists() }
+        if (sup != null) {
+            val s = sup.readText()
+            check("la sección de la mira explica cómo se usa", s.contains("CÓMO SE USA"))
+            check("explica los tres pasos, no sólo el permiso",
+                s.contains("Dale permiso") && s.contains("Actívala") && s.contains("Abre el juego"))
+            check("y dice que deja pasar los toques, que es la duda real",
+                s.contains("sin tapar los toques"))
+        }
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

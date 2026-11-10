@@ -45,7 +45,39 @@ fun PantallaSuperposicion(
 ) {
     Column(Modifier.fillMaxWidth()) {
 
-        // ── Estado, en una sola tarjeta. Verde si está dibujando, ámbar si falta permiso.
+        // ── Cómo se usa, antes de los ajustes. La duda número uno era «vale, lo activo… ¿y
+        //    ahora qué?». Se contesta aquí, en tres líneas, antes de pedir nada.
+        Grupo(rotulo = "CÓMO SE USA") {
+            Column(Modifier.fillMaxWidth().padding(14.dp)) {
+                listOf(
+                    "1" to "Dale permiso de dibujar encima de otras apps. Es el único permiso que " +
+                        "necesita y se lo puedes quitar cuando quieras.",
+                    "2" to "Actívala. Aparece un punto de mira y un contador de FPS, sin tapar los toques: " +
+                        "el juego recibe los dedos como si no estuviera.",
+                    "3" to "Abre el juego. Si algo no cuadra, arrástrala: se queda donde la dejes.",
+                ).forEachIndexed { i, (n, texto) ->
+                    if (i > 0) Hilo(sangrado = 15)
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp)) {
+                        Text(
+                            n,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Cristal.marca,
+                            modifier = Modifier.width(20.dp),
+                        )
+                        Text(
+                            texto,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            color = Cristal.textoSuave,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+
+        // ── Estado. Verde si está dibujando, ámbar si falta permiso.
         val color = when {
             activo -> Cristal.verde
             tienePermiso -> Cristal.cian
