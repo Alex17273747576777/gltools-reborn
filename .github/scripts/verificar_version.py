@@ -29,7 +29,15 @@ for apk in archivos:
     firma = subprocess.run([str(apksigner), "verify", "--verbose", "--print-certs", str(apk)], text=True, capture_output=True)
     if firmado:
         assert firma.returncode == 0, "Firma APK inválida"
-        certificados = re.findall(r"Signer #\d+ certificate SHA-256 digest: ([a-fA-F0-9]+)", firma.stdout)
+        # apksigner imprime «V2 Signer: certificate SHA-256 digest: …» desde la API 30, y
+        # «Signer #1 certificate SHA-256 digest: …» en versiones antiguas. La expresión
+        # original sólo entendía el segundo formato, así que un APK correctamente firmado
+        # fallaba la comprobación. Se aceptan los dos, y se exige que haya exactamente uno
+        # distinto: dos certificados distintos en el mismo APK también es un error.
+        certificados = sorted(set(re.findall(
+            r"(?:V\d(?:\.\d)? Signer|Signer #\d+):? certificate SHA-256 digest: ([a-fA-F0-9]+)",
+            firma.stdout,
+        )))
         # Diagnóstico sin secretos: la huella de un certificado es pública (va en cada APK).
         if certificados != [CERTIFICADO]:
             print("CERT_ENCONTRADOS=" + ",".join(certificados), flush=True)
