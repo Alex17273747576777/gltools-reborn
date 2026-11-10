@@ -1426,6 +1426,46 @@ run {
             java.io.File(uiDir, "Grupo.kt").exists())
     }
 
+
+    // ── 1.9.3: nada de datos cortados a la mitad ─────────────────────────────
+    //
+    // Lo que pasó: `FilaDato` y `Dato` pintaban el valor con `maxLines = 1`. La huella del
+    // sistema (`ro.build.fingerprint`) mide 90 caracteres: se cortaba a media cadena y no había
+    // forma de leerla entera. Y en un sitio se cortaba a mano con `.take(24) + "…"`. Un dato que
+    // no se puede leer no está en la app.
+    println()
+    println("── sin truncamiento ──")
+    if (uiDir != null) {
+        val pantallas = uiDir.listFiles { f -> f.extension == "kt" }!!
+            .filter { it.name !in setOf("Tema.kt", "Iconos.kt") }
+        // Ningún valor se corta a mano con take()/substring() para que quepa.
+        val cortados = pantallas.filter { f ->
+            Regex("\\.take\\s*\\(\\s*\\d+\\s*\\)").findAll(f.readText())
+                .any { m -> !m.value.contains("take(0)") }
+        }.map { it.name }
+        check("ningún valor se corta a mano con take(n)", cortados.isEmpty(), cortados.toString())
+
+        // El par etiqueta/valor tiene que poder mostrar el valor entero.
+        val grupo = java.io.File(uiDir, "Grupo.kt")
+        check("el componente de dato existe", grupo.exists())
+        if (grupo.exists()) {
+            val g = grupo.readText()
+            val bloqueDato = g.substringAfter("internal fun Dato(").substringBefore("\n@Composable")
+            check(
+                "el dato largo se muestra en varias líneas, no cortado",
+                bloqueDato.contains("valor.length > ") && bloqueDato.contains("lineHeight"),
+            )
+            check("el dato se puede copiar para leerlo entero",
+                bloqueDato.contains("LocalClipboardManager"))
+        }
+        // Y en la portada, lo mismo: no puede quedarse un maxLines=1 sobre un valor del sistema.
+        val home = java.io.File(uiDir, "Home.kt")
+        if (home.exists()) {
+            val h = home.readText()
+            check("la huella no se recorta en la portada", !h.contains("fingerprint\"]?.take("))
+        }
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

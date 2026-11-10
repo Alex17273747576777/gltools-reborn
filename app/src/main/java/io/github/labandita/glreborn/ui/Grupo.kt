@@ -100,22 +100,82 @@ internal fun Hilo(sangrado: Int = 14) {
     )
 }
 
-/** Etiqueta y valor: el par que se repite en toda la app. */
+/**
+ * Etiqueta y valor: el par que se repite en toda la app.
+ *
+ * **El fallo que había aquí era de truncamiento.** El valor iba con `maxLines = 1`, así que
+ * `ro.build.fingerprint` —que mide 90 caracteres— se cortaba a media cadena y **no había forma de
+ * leerlo entero**: ni desplazándolo, ni pulsándolo, ni en ningún otro sitio. Un dato que no se
+ * puede leer no está en la app.
+ *
+ * Ahora, si el valor no cabe:
+ *  · se muestra **en varias líneas** (parte por los separadores naturales, no por donde caiga), y
+ *  · **se puede pulsar para copiarlo**, con un aviso de que se ha copiado.
+ *
+ * La etiqueta pasa a ir **arriba** cuando el valor es largo: dos columnas sólo caben si los dos
+ * lados son cortos.
+ */
 @Composable
-internal fun Dato(etiqueta: String, valor: String, mono: Boolean = true, color: Color = Cristal.texto) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(etiqueta, fontSize = 12.sp, color = Cristal.textoSuave, modifier = Modifier.weight(1f))
-        Spacer(Modifier.width(12.dp))
-        Text(
-            valor,
-            fontSize = 12.sp,
-            color = color,
-            maxLines = 1,
-            fontFamily = if (mono) FontFamily.Monospace else null,
-        )
+internal fun Dato(
+    etiqueta: String,
+    valor: String,
+    mono: Boolean = true,
+    color: Color = Cristal.texto,
+    copiable: Boolean = true,
+) {
+    val largo = valor.length > 34
+    val contexto = androidx.compose.ui.platform.LocalContext.current
+    val portapapeles = androidx.compose.ui.platform.LocalClipboardManager.current
+    val acento = if (color == Cristal.texto) Cristal.marca else color
+
+    val copiar: () -> Unit = {
+        portapapeles.setText(androidx.compose.ui.text.AnnotatedString(valor))
+        android.widget.Toast
+            .makeText(contexto, "Copiado: $etiqueta", android.widget.Toast.LENGTH_SHORT)
+            .show()
+    }
+
+    if (largo) {
+        // Vertical: etiqueta pequeña arriba, valor entero debajo. Se parte por espacios.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .then(
+                    if (copiable) Modifier.clickable { copiar() } else Modifier,
+                )
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+        ) {
+            Text(etiqueta, fontSize = 11.sp, color = Cristal.textoSuave)
+            Spacer(Modifier.height(3.dp))
+            Text(
+                valor,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                color = color,
+                fontFamily = if (mono) FontFamily.Monospace else null,
+            )
+            if (copiable) {
+                Spacer(Modifier.height(4.dp))
+                Text("toca para copiar", fontSize = 9.5.sp, letterSpacing = 0.6.sp, color = acento)
+            }
+        }
+    } else {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .then(if (copiable) Modifier.clickable { copiar() } else Modifier)
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(etiqueta, fontSize = 12.sp, color = Cristal.textoSuave, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(12.dp))
+            Text(
+                valor,
+                fontSize = 12.sp,
+                color = color,
+                fontFamily = if (mono) FontFamily.Monospace else null,
+            )
+        }
     }
 }
 

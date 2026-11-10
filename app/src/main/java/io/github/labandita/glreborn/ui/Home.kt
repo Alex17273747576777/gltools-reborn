@@ -352,7 +352,7 @@ private fun PanelSistema(d: Sonda.Datos?, actual: Map<String, String>, compat: S
         Linea()
         FilaDato("Características", d?.caracteristicas?.ifBlank { "sin declarar" } ?: "sin leer")
         Linea()
-        FilaDato("Huella", actual["ro.build.fingerprint"]?.take(24)?.plus("…") ?: "sin declarar")
+        FilaDato("Huella", actual["ro.build.fingerprint"]?.ifBlank { null } ?: "sin declarar")
         if (compat.isNotBlank()) {
             Spacer(Modifier.height(10.dp))
             Text(compat, fontSize = 10.5.sp, lineHeight = 16.sp, color = Cristal.textoTenue)
@@ -548,12 +548,19 @@ private fun FilaDato(etiqueta: String, valor: String) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(etiqueta, fontSize = 11.5.sp, color = Cristal.textoSuave)
-        Text(
-            valor,
-            fontSize = 11.5.sp, color = Cristal.texto,
-            fontFamily = FontFamily.Monospace, maxLines = 1,
-        )
+        // Sin truncar: si el valor es largo va arriba/abajo, no cortado a la derecha.
+        if (valor.length > 30) {
+            Text(etiqueta, fontSize = 11.sp, color = Cristal.textoSuave)
+            Spacer(Modifier.height(3.dp))
+            Text(
+                valor, fontSize = 11.5.sp, lineHeight = 16.sp, color = Cristal.texto,
+                fontFamily = FontFamily.Monospace,
+            )
+        } else {
+            Text(etiqueta, fontSize = 11.5.sp, color = Cristal.textoSuave)
+            Spacer(Modifier.weight(1f))
+            Text(valor, fontSize = 11.5.sp, color = Cristal.texto, fontFamily = FontFamily.Monospace)
+        }
     }
 }
 

@@ -274,7 +274,7 @@ fun PantallaPrincipal(
                                 }
                             }
                         }
-                        items(sistemasTop.take(100)) { s ->
+                        items(sistemasTop) { s ->
                             FilaSistemaTop(s)
                         }
                         if (sistemasTop.size > 100) {
@@ -380,7 +380,7 @@ fun PantallaPrincipal(
                             "en el código: congelar SystemUI deja el teléfono sin interfaz.",
                             fontSize = 11.sp, lineHeight = 15.sp, color = Cristal.textoSuave)
                     }
-                    items(apps.take(40)) { a ->
+                    items(apps) { a ->
                         FilaAppAccion(
                             app = a,
                             congelada = congeladas.contains(a.paquete),
@@ -967,7 +967,7 @@ fun PantallaPrincipal(
                             datosEquipo.forEach { (k, v) ->
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text(k, fontSize = 11.sp, color = Cristal.textoSuave)
-                                    Text(v.take(30), fontSize = 11.sp, color = Cristal.texto,
+                                    Text(v, fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.texto,
                                         fontFamily = FontFamily.Monospace)
                                 }
                             }
