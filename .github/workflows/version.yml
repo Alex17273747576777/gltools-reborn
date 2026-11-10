@@ -1,0 +1,119 @@
+name: Preparar o publicar version
+on:
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: Publicar solamente con firma original verificada
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: version-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  paquete:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    outputs:
+      firmado: ${{ steps.clave.outputs.firmado }}
+      artefacto: ${{ steps.clave.outputs.artefacto }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Preparar clave existente, nunca generar otra
+        id: clave
+        env:
+          CLAVE: ${{ secrets.REBORN_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.REBORN_STORE_PASS }}
+          KEY_ALIAS: ${{ secrets.REBORN_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.REBORN_KEY_PASS }}
+          PUBLICAR: ${{ inputs.publicar }}
+        run: |
+          set -euo pipefail
+          if [ -n "$CLAVE" ] && [ -n "$STORE_PASS" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASS" ]; then
+            umask 077
+            printf '%s' "$CLAVE" | base64 --decode > "$RUNNER_TEMP/reborn.jks"
+            echo "REBORN_KEYSTORE=$RUNNER_TEMP/reborn.jks" >> "$GITHUB_ENV"
+            echo "firmado=true" >> "$GITHUB_OUTPUT"
+            echo "artefacto=version-1.12.1-firma-verificada" >> "$GITHUB_OUTPUT"
+          else
+            if [ "$PUBLICAR" = true ]; then
+              echo '::error::Falta la firma original: no se publica ni se sustituye por debug.'
+              exit 1
+            fi
+            echo "firmado=false" >> "$GITHUB_OUTPUT"
+            echo "artefacto=NO-INSTALABLE-1.12.1-SIN-FIRMA" >> "$GITHUB_OUTPUT"
+            echo '::warning::Sólo validación de empaquetado; salida sin firma, no instalable.'
+          fi
+      - name: Compilar, probar y empaquetar ambas variantes
+        env:
+          REBORN_STORE_PASS: ${{ secrets.REBORN_STORE_PASS }}
+          REBORN_KEY_ALIAS: ${{ secrets.REBORN_KEY_ALIAS }}
+          REBORN_KEY_PASS: ${{ secrets.REBORN_KEY_PASS }}
+          FIRMADO: ${{ steps.clave.outputs.firmado }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/paquete"
+          bash ./gradlew :app:pruebasNucleo :app:assembleRelease --no-daemon --console=plain
+          if [ "$FIRMADO" = true ]; then
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-1.12.1.apk"
+          else
+            cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-1.12.1-UNSIGNED-NO-INSTALAR.apk"
+          fi
+          bash ./gradlew :app:clean :app:assembleRelease -PrebornDatos=crudo --no-daemon --console=plain
+          if [ "$FIRMADO" = true ]; then
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-1.12.1-sin-comprimir.apk"
+          else
+            cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-1.12.1-sin-comprimir-UNSIGNED-NO-INSTALAR.apk"
+          fi
+      - name: Verificar paquete, version, certificado y hashes
+        env:
+          FIRMADO: ${{ steps.clave.outputs.firmado }}
+        run: python3 .github/scripts/verificar_version.py "$RUNNER_TEMP/paquete"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.clave.outputs.artefacto }}
+          path: ${{ runner.temp }}/paquete/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Eliminar copia temporal de la clave
+        if: always()
+        run: rm -f "$RUNNER_TEMP/reborn.jks"
+  publicar:
+    needs: paquete
+    if: inputs.publicar && needs.paquete.outputs.firmado == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.paquete.outputs.artefacto }}
+          path: paquete
+      - name: Publicar sólo los binarios verificados del commit probado
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          head=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq .object.sha)
+          test "$head" = "$SHA"
+          python3 - <<'PYVERIFY'
+          import json, pathlib, os, hashlib
+          p = pathlib.Path('paquete')
+          d = json.loads((p/'verificacion.json').read_text())
+          assert d['commit'] == os.environ['SHA'] and d['firmado'] is True
+          assert d['certificado_sha256'] == '1ff4c6ee90263a73a7ea6097de5b1f31bcd049c805e384904d2087b4c6c9e803'
+          for a in d['apks']:
+              assert pathlib.Path(a['nombre']).name == a['nombre']
+              assert hashlib.sha256((p/a['nombre']).read_bytes()).hexdigest() == a['sha256']
+          PYVERIFY
+          gh release create v1.12.1 --draft --target "$SHA" --title 'GLTools Reborn 1.12.1' --notes 'Corrige diagnóstico de propiedades y energía, validación shell y reversiones. Compilación y lógica verificadas; sin validación física ni garantía de modo fijo en cada ROM.' paquete/*.apk paquete/SHA256SUMS.txt paquete/verificacion.json
+          gh release edit v1.12.1 --draft=false --latest

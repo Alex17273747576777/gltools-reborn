@@ -625,6 +625,7 @@ run {
 // ─────────────────────────────────────────────────────────────────────────────
 run {
     pruebasEjecucionRendimiento()
+    pruebasCapturaCompatibilidad()
     println("\nAcciones de rendimiento (lo que hacen los módulos, sin root)")
 
     check("hay acciones disponibles", Rendimiento.catalogo.isNotEmpty())

@@ -151,7 +151,7 @@ class Compatibilidad(private val shell: Shell) {
             pruebas += probar("Densidad (wm)", "wm density")
             pruebas += probar("Lista de apps (pm)", "pm list packages -3")
             pruebas += probar("Ajustes del sistema (settings)", "settings get global private_dns_mode")
-            pruebas += probar("Congelar apps (pm disable)", "pm list packages -d")
+            pruebas += probar("Consultar apps deshabilitadas (pm)", "pm list packages -d")
             // Cómo se prueba y por qué, en `juzgarModoFijo`.
             pruebas += probarModoRendimiento()
         } else {
@@ -159,7 +159,7 @@ class Compatibilidad(private val shell: Shell) {
             for (n in listOf("Lectura de propiedades", "Escribir y deshacer una propiedad",
                 "Propiedades protegidas (persist.*, ro.*)", "Resolución (wm)",
                 "Densidad (wm)", "Lista de apps (pm)", "Ajustes del sistema (settings)",
-                "Congelar apps (pm disable)", "Modo rendimiento (cmd)")) {
+                "Consultar apps deshabilitadas (pm)", "Modo rendimiento (cmd)")) {
                 pruebas += Prueba(n, Prueba.Estado.NO_APLICA, motivo)
             }
         }
@@ -184,12 +184,12 @@ class Compatibilidad(private val shell: Shell) {
         leido: String,
     ): Prueba = when {
         codigo == null -> Prueba(nombre, Prueba.Estado.FALLA, "sin respuesta del gestor")
+        codigo != 0 -> Prueba(nombre, Prueba.Estado.FALLA,
+            "Android rechazó escribir `$clave` (código $codigo). La vía actual puede estar " +
+                "limitada por permisos o SELinux; esto no demuestra que todas las propiedades " +
+                "estén bloqueadas. Respuesta: ${motivo.take(300)}")
         leido == "1" -> Prueba(nombre, Prueba.Estado.PASA,
-            "se escribió `$clave`, se leyó y se devolvió a como estaba. No queda nada cambiado.")
-        motivo.contains("Failed to set property") -> Prueba(nombre, Prueba.Estado.FALLA,
-            "Android rechazó escribir `$clave`. Es una propiedad que esta vía debería poder " +
-                "tocar, así que el bloqueo lo pone el fabricante: los perfiles que escriben " +
-                "propiedades no funcionarán aquí. Contestó: ${motivo.take(120)}")
+            "El valor de `$clave` se leyó como 1. La restauración se comprueba por separado.")
         leido.isEmpty() -> Prueba(nombre, Prueba.Estado.FALLA,
             "el comando no dio error, pero `$clave` no cambió: ${motivo.take(120)}")
         else -> Prueba(nombre, Prueba.Estado.FALLA,
@@ -252,15 +252,17 @@ class Compatibilidad(private val shell: Shell) {
      */
     private fun probarProtegidas(): Prueba {
         val nombre = "Propiedades protegidas (persist.*, ro.*)"
-        val uid = shell.correr("id -u")?.texto?.trim()
-        if (!esRootDe(uid)) {
-            return Prueba(nombre, Prueba.Estado.NO_APLICA,
-                "la vía actual es ADB (uid ${uid?.take(8).orEmpty().ifBlank { "?" }}), no root. " +
-                    "Android sólo deja a esa vía escribir debug.* y persist.debug.*; el resto lo " +
-                    "reserva al sistema y a root. Los perfiles que cambian esas propiedades " +
-                    "necesitan root: no es un fallo de tu teléfono.")
-        }
-        return escribirYDeshacer(nombre, CLAVE_PROTEGIDA)
+        val identidad = shell.correr("id -u")
+        if (identidad?.ok != true) return Prueba(nombre, Prueba.Estado.NO_APLICA,
+            "No se confirmó la identidad de la vía. No se intentó escribir una propiedad protegida.")
+        val root = esRootDe(identidad.texto)
+        return Prueba(nombre, Prueba.Estado.NO_APLICA,
+            if (root) "La vía declara UID 0, pero SELinux y las propiedades de sólo lectura siguen " +
+                "teniendo restricciones. Este diagnóstico no crea propiedades persistentes. " +
+                "No se probó ni se garantiza escritura de persist.* o ro.*."
+            else "La vía declara UID ${identidad.texto.trim().take(12)}; no se confirmó root. " +
+                "No se intentó escribir persist.reborn.prueba. Es un límite de permisos, " +
+                "no una prueba de avería del teléfono. Una propiedad inventada no activa rendimiento.")
     }
 
     private fun escribirYDeshacer(nombre: String, clave: String): Prueba {

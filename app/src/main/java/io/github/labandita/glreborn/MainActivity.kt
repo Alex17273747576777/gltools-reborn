@@ -786,7 +786,7 @@ private fun App(
             irreversibleAplicado = false,
             sinApps = apps.isEmpty(),
         ),
-        version = "1.12.0",
+        version = Build.VERSION_REBORN,
     )
 }
 
