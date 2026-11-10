@@ -1676,8 +1676,8 @@ run {
                 val c = compat.readText()
                 check("la prueba de escritura no toca una propiedad del sistema",
                     !c.contains("setprop ro.product.marketname"))
-                check("después de escribir, vuelve a leer y restaura",
-                    c.contains("getprop $" + "clave") && c.contains("setprop $" + "clave '$" + "antes'"))
+                check("después de escribir, vuelve a leer y verifica la restauración",
+                    c.contains("valorRestaurado(restauracion?.codigo, lecturaFinal?.codigo, lecturaFinal?.texto, antes)"))
             }
 
             // 5. El modo rendimiento se juzga por el código de salida de la orden, que es lo único
@@ -2017,6 +2017,13 @@ run {
         // Lo que se vio en un teléfono: «Failed to set property 'persist.reborn.prueba'» y
         // «Modo rendimiento (cmd): Power manager (power) commands: help …».
         val cpd = io.github.labandita.glreborn.core.Compatibilidad
+        check("restaurar exige código cero y lectura coincidente", cpd.valorRestaurado(0, 0, "anterior", "anterior"))
+        check("restaurar fallido nunca pasa aunque el valor coincida", !cpd.valorRestaurado(1, 0, "anterior", "anterior"))
+        check("lectura fallida no confirma restauración", !cpd.valorRestaurado(0, 1, "anterior", "anterior"))
+        check("valor distinto no confirma restauración", !cpd.valorRestaurado(0, 0, "nuevo", "anterior"))
+        check("sin respuesta de restauración no pasa", !cpd.valorRestaurado(null, 0, "anterior", "anterior"))
+        check("sin lectura de restauración no pasa", !cpd.valorRestaurado(0, null, null, ""))
+        check("valor vacío puede restaurarse sin afirmar borrado de clave", cpd.valorRestaurado(0, 0, "", ""))
         val cpi = io.github.labandita.glreborn.core.Compatibilidad(io.github.labandita.glreborn.shizuku.Shell())
         check("debug.* lo puede escribir la vía ADB", cpd.escribibleSinRoot("debug.reborn.prueba"))
         check("persist.debug.* también", cpd.escribibleSinRoot("persist.debug.algo"))

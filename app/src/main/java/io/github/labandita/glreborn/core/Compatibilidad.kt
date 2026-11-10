@@ -16,6 +16,10 @@ import io.github.labandita.glreborn.shizuku.Shell
 class Compatibilidad(private val shell: Shell) {
 
     companion object {
+        /** Leer el valor esperado no basta si falló la restauración o la lectura. */
+        fun valorRestaurado(codigo: Int?, codigoLectura: Int?, leido: String?, antes: String): Boolean =
+            codigo == 0 && codigoLectura == 0 && leido?.trim() == antes
+
         /** Propiedad de la prueba de escritura: de las que la vía ADB sí puede tocar. */
         const val CLAVE_PRUEBA = "debug.reborn.prueba"
         /** Propiedad que sólo root puede escribir. Sólo se prueba cuando la vía es root. */
@@ -269,7 +273,7 @@ class Compatibilidad(private val shell: Shell) {
         val lecturaNueva = shell.correr("getprop $clave")
         val restauracion = shell.correr("setprop $clave ${citar(antes)}")
         val lecturaFinal = shell.correr("getprop $clave")
-        if (restauracion?.ok != true || lecturaFinal?.ok != true || lecturaFinal.texto.trim() != antes) {
+        if (!valorRestaurado(restauracion?.codigo, lecturaFinal?.codigo, lecturaFinal?.texto, antes)) {
             return Prueba(nombre, Prueba.Estado.FALLA,
                 "Restauración de `$clave` NO CONFIRMADA. Valor original: ${antes.take(90)}. " +
                     "Respuesta: ${restauracion?.motivo ?: "sin respuesta"}. Revisa el dispositivo.")
