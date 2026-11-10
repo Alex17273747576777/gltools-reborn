@@ -73,6 +73,10 @@ fun PantallaHome(
     onModo: () -> Unit,
     falloLectura: String? = null,
     onDescartarFalloLectura: () -> Unit = {},
+    busqueda: String = "",
+    onBuscar: (String) -> Unit = {},
+    hallazgos: List<io.github.labandita.glreborn.core.BusquedaGlobal.Hallazgo> = emptyList(),
+    onIrABusqueda: (io.github.labandita.glreborn.core.BusquedaGlobal.Destino) -> Unit = {},
 ) {    // Qué medidor está encendido. Vive aquí para que el carrusel y el panel sean uno.
     var medidor by rememberSaveable { mutableStateOf(0) }
 
@@ -87,6 +91,15 @@ fun PantallaHome(
     ) {
         // ── 1. Dónde estás. El estado, sin caja; una barra que significa algo.
         EstadoCabecera(banner, puede)
+
+        // ── 1c. BÚSQUEDA. Una caja, y todo lo que la app sabe. A partir de dos letras.
+        Spacer(Modifier.height(16.dp))
+        CajaBusqueda(
+            texto = busqueda,
+            onTexto = onBuscar,
+            resultados = hallazgos,
+            onIr = onIrABusqueda,
+        )
 
         // ── 2. Si alguna lectura del teléfono falló, se dice.
         if (falloLectura != null) {

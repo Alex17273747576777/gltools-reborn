@@ -91,8 +91,21 @@ fun PantallaPrincipal(
     onMoverSuperposicion: () -> Unit,
     falloLectura: String? = null,
     onDescartarFalloLectura: () -> Unit = {},
+    // La búsqueda no entra por parámetro: su estado vive aquí (ver arriba).
 ) {
     var destino by rememberSaveable { mutableStateOf(Destino.HOME) }
+    // La búsqueda vive aquí porque aquí vive la navegación: un resultado tiene que poder mover
+    // el destino y la pestaña, y eso sólo se hace desde dentro.
+    var busqueda by rememberSaveable { mutableStateOf("") }
+    val hallazgos = remember(busqueda, biblioteca, catalogoDispositivos) {
+        if (busqueda.length < 2) emptyList()
+        else io.github.labandita.glreborn.core.BusquedaGlobal.buscar(
+            consulta = busqueda,
+            perfiles = io.github.labandita.glreborn.core.Perfiles.todos,
+            biblioteca = biblioteca,
+            dispositivos = catalogoDispositivos,
+        )
+    }
     // Qué confianza se está mostrando en el catálogo (0 = todas).
     var filtroConfianza by rememberSaveable { mutableStateOf(0) }
     var pestana by rememberSaveable { mutableStateOf<Pestana?>(null) }
@@ -183,6 +196,16 @@ fun PantallaPrincipal(
                 onModo = onModo,
                 falloLectura = falloLectura,
                 onDescartarFalloLectura = onDescartarFalloLectura,
+                busqueda = busqueda,
+                onBuscar = { busqueda = it },
+                hallazgos = hallazgos,
+                onIrABusqueda = { d ->
+                    runCatching {
+                        destino = Destino.valueOf(d.destino)
+                        pestana = d.pestana?.let { Pestana.valueOf(it) } ?: Navegacion.inicial(destino)
+                        busqueda = ""
+                    }
+                },
             )
             else -> LazyColumn(
                 Modifier.fillMaxSize(),

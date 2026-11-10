@@ -1441,6 +1441,8 @@ run {
             .filter { it.name !in setOf("Tema.kt", "Iconos.kt") }
         // Ningún valor se corta a mano con take()/substring() para que quepa.
         val cortados = pantallas.filter { f ->
+            // `take(limite)` en el núcleo de la búsqueda es un tope de lista que se puede subir,
+            // no un dato cortado: la pantalla no lo esconde, sólo ordena. Todo lo demás, prohibido.
             Regex("\\.take\\s*\\(\\s*\\d+\\s*\\)").findAll(f.readText())
                 .any { m -> !m.value.contains("take(0)") }
         }.map { it.name }
@@ -1724,6 +1726,96 @@ run {
             check("con barra, no sólo un número", h.contains("BarraRecurso"))
             check("y dice que lo que no se puede leer no se estima",
                 h.contains("no se pueden leer sin root"))
+        }
+    }
+
+
+    // ── 1.10.0: búsqueda global ──────────────────────────────────────────────
+    //
+    // Hasta la 1.9.9 había que saber DÓNDE estaba cada cosa: el modelo en Perfiles, la acción de
+    // rendimiento en Herramientas, la ficha en Datos. Una caja que busque en todo lo que la app
+    // sabe es lo que faltaba. Estas leyes obligan a que no mienta.
+    println()
+    println("── búsqueda global ──")
+    run {
+        val b = io.github.labandita.glreborn.core.BusquedaGlobal
+        fun buscar(q: String) = b.buscar(q, Perfiles.todos, Perfiles.todos, emptyList())
+
+        // Con una letra no se busca: sería devolverlo todo y hacer creer que la app adivina.
+        check("una sola letra no devuelve nada", buscar("a").isEmpty())
+        check("el vacío no devuelve nada", buscar("   ").isEmpty())
+
+        // Los acentos y las mayúsculas no son cosa del usuario.
+        val conAcento = buscar("catálogo")
+        val sinAcento = buscar("catalogo")
+        check("«catálogo» y «catalogo» dan lo mismo",
+            conAcento.map { it.titulo } == sinAcento.map { it.titulo })
+        check("da igual escribir en mayúsculas", buscar("CATALOGO").isNotEmpty())
+
+        // Una palabra suelta tiene que llevar a algún sitio de la app.
+        listOf("mira", "dns", "congelar", "respaldo", "compatibilidad", "aplicado").forEach { q ->
+            check("«$q» encuentra una sección", buscar(q).any { it.tipo == io.github.labandita.glreborn.core.BusquedaGlobal.Tipo.SECCION })
+        }
+
+        // Y los perfiles del catálogo se encuentran por modelo, SoC y GPU.
+        check("«pixel» encuentra el Pixel 8 Pro",
+            buscar("pixel").any { it.titulo == "Google Pixel 8 Pro" })
+        check("«snapdragon» encuentra perfiles por su SoC", buscar("snapdragon").isNotEmpty())
+
+        // Todas las palabras cuentan: «pixel gpu» no puede devolver todo lo que tenga «pixel».
+        val unaPalabra = buscar("pixel").size
+        val dosPalabras = buscar("pixel gpu").size
+        check("añadir una palabra no puede devolver MÁS", dosPalabras <= unaPalabra,
+            "$dosPalabras > $unaPalabra")
+        check("y una combinación imposible no inventa resultados",
+            buscar("pixel zzzzz").isEmpty())
+
+        // Lo que está en el catálogo y en tu biblioteca no sale dos veces.
+        val doble = b.buscar("pixel", Perfiles.todos, Perfiles.todos, emptyList())
+        check("sin repetidos entre catálogo y biblioteca",
+            doble.size == doble.map { it.titulo to it.detalle }.toSet().size)
+        // Aunque se pasen los mismos perfiles dos veces, el propio pesa más.
+        check("los perfiles propios van antes que los del catálogo",
+            doble.firstOrNull()?.detalle?.contains("tu perfil") == true)
+
+        // Los hallazgos tienen que poder ordenarse y no repetir puntos inventados.
+        val todos = buscar("pixel")
+        check("los resultados vienen ordenados por puntos",
+            todos.map { it.puntos } == todos.map { it.puntos }.sortedDescending())
+
+        // Nada de destinos fantasma: cada hallazgo lleva a una pestaña que existe.
+        val malos = listOf("mira", "dns", "pixel", "congelar").flatMap { q -> b.buscar(q, Perfiles.todos, emptyList(), emptyList()) }
+            .map { it.ir }
+            .filter { d ->
+                val destino = runCatching { Destino.valueOf(d.destino) }.getOrNull()
+                val pestana = d.pestana?.let { runCatching { Pestana.valueOf(it) }.getOrNull() }
+                destino == null || (d.pestana != null && pestana == null) || (pestana != null && pestana.destino != destino)
+            }
+        check("todos los resultados llevan a una pantalla que existe", malos.isEmpty(),
+            malos.take(3).toString())
+
+        // Sin resultados no se deja el hueco vacío: se sugiere algo que sí funciona.
+        val sugerencias = b.sugerencias()
+        check("hay sugerencias para cuando no hay nada", sugerencias.size >= 4)
+        check("y todas las sugerencias devuelven algo",
+            sugerencias.all { s -> buscar(s).isNotEmpty() }, sugerencias.toString())
+
+        // El tope de la lista se respeta: 40 en este teléfono de 4 GB, y se puede subir.
+        check("el tope de la lista se cumple", b.buscar("a", Perfiles.todos, emptyList(), emptyList(), 5).size <= 5)
+
+        // La caja y el «sin resultados» existen y no cortan a mano lo que escribes.
+        val uiBuscador = java.io.File(uiDir, "BuscadorUI.kt")
+        check("la caja de búsqueda existe", uiBuscador.exists())
+        if (uiBuscador.exists()) {
+            val u = uiBuscador.readText()
+            check("la caja enseña lo escrito entero, no recortado",
+                !Regex("\\.take\\s*\\(\\s*\\d+\\s*\\)").containsMatchIn(u))
+            check("y dice qué se puede buscar cuando no encuentra", u.contains("SinResultados"))
+        }
+        // Y la portada la tiene cableada de verdad, con su caja.
+        val home = java.io.File(uiDir, "Home.kt")
+        if (home.exists()) {
+            check("la portada trae la búsqueda", home.readText().contains("CajaBusqueda"))
         }
     }
 
