@@ -113,16 +113,24 @@ class Compatibilidad(private val shell: Shell) {
 
         if (shell.disponible()) {
             pruebas += probar("Lectura de propiedades", "getprop ro.product.model")
-            pruebas += probar("Escritura de propiedades", "setprop ro.product.marketname prueba_reborn")
+            // Antes se probaba escribiendo `ro.product.marketname`... y no se deshacía: el
+            // teléfono se quedaba con un valor inventado y **la app no lo apuntaba en el registro**,
+            // así que «Restaurar» no sabía que tenía que devolverlo. Una prueba que deja basura
+            // es peor que no probar.
+            pruebas += probarEscritura()
             pruebas += probar("Resolución (wm)", "wm size")
             pruebas += probar("Densidad (wm)", "wm density")
             pruebas += probar("Lista de apps (pm)", "pm list packages -3")
             pruebas += probar("Ajustes del sistema (settings)", "settings get global private_dns_mode")
             pruebas += probar("Congelar apps (pm disable)", "pm list packages -d")
-            pruebas += probar("Modo rendimiento (cmd)", "cmd power get-fixed-performance-mode-supported")
+            // `get-fixed-performance-mode-supported` NO EXISTE: `cmd power` en Android 13 sólo
+            // tiene `set-mode`, `set-fixed-performance-mode-enabled` y `help`. De ahí el 255.
+            // Lo que sí se puede saber sin inventar nada: si el servicio de energía responde y
+            // si el sistema admite el modo fijo.
+            pruebas += probarModoRendimiento()
         } else {
             val motivo = "Se salta: sin shell no se puede probar"
-            for (n in listOf("Lectura de propiedades", "Escritura de propiedades", "Resolución (wm)",
+            for (n in listOf("Lectura de propiedades", "Escribir y deshacer una propiedad", "Resolución (wm)",
                 "Densidad (wm)", "Lista de apps (pm)", "Ajustes del sistema (settings)",
                 "Congelar apps (pm disable)", "Modo rendimiento (cmd)")) {
                 pruebas += Prueba(n, Prueba.Estado.NO_APLICA, motivo)
@@ -132,14 +140,73 @@ class Compatibilidad(private val shell: Shell) {
         return pruebas
     }
 
+    /**
+     * Prueba de escritura **que se deshace**.
+     *
+     * Se lee el valor anterior, se escribe, se comprueba y se devuelve el anterior. Así la prueba
+     * contesta la pregunta de verdad («¿puede esta app escribir propiedades con su vía actual?»)
+     * sin dejar el teléfono cambiado si sale mal a la mitad.
+     */
+    private fun probarEscritura(): Prueba {
+        val clave = "persist.reborn.prueba"
+        val antes = shell.correr("getprop $clave")?.texto?.trim().orEmpty()
+        val escribio = shell.correr("setprop $clave 1")
+        if (escribio == null) {
+            return Prueba("Escribir y deshacer una propiedad", Prueba.Estado.FALLA,
+                "sin respuesta del gestor")
+        }
+        val leido = shell.correr("getprop $clave")?.texto?.trim().orEmpty()
+        // Se deshace SIEMPRE, antes de devolver el resultado.
+        shell.correr("setprop $clave '${antes.ifBlank { "" }}'")
+        return when {
+            leido == "1" && antes.isBlank() -> Prueba(
+                "Escribir y deshacer una propiedad", Prueba.Estado.PASA,
+                "se escribió, se leyó y se borró. No queda nada cambiado.",
+            )
+            leido.isEmpty() -> Prueba(
+                "Escribir y deshacer una propiedad", Prueba.Estado.FALLA,
+                "sonó bien pero no cambió: ${escribio.motivo}",
+            )
+            else -> Prueba(
+                "Escribir y deshacer una propiedad", Prueba.Estado.FALLA,
+                "se escribió lo que dice el código, no 1 (${leido.take(30)})",
+            )
+        }
+    }
+
+    /**
+     * Modo rendimiento, **sin inventar comandos**.
+     *
+     * Android no tiene una consulta de «¿está soportado?». Lo que se puede hacer, y se hace:
+     * preguntar a `cmd power` si responde (código 0 con su ayuda) y probar el encendido leyendo
+     * el ajuste que deja (`power_fixed_performance_mode_enabled`). Si el sistema no lo admite,
+     * `settings` lo dirá.
+     */
+    private fun probarModoRendimiento(): Prueba {
+        val responde = shell.correr("cmd power help")
+        if (responde == null || responde.codigo != 0) {
+            return Prueba("Modo rendimiento (cmd)", Prueba.Estado.FALLA,
+                "el servicio de energía no responde a `cmd power`: " +
+                    "${responde?.motivo ?: "sin respuesta"}")
+        }
+        val ajuste = shell.correr("settings get global power_fixed_performance_mode_enabled")
+        val hayAjuste = ajuste != null && ajuste.codigo == 0 &&
+            ajuste.texto.trim() in listOf("0", "1")
+        return if (hayAjuste) Prueba("Modo rendimiento (cmd)", Prueba.Estado.PASA,
+            "el sistema expone el modo fijo (ahora en ${ajuste!!.texto.trim()})")
+        else Prueba("Modo rendimiento (cmd)", Prueba.Estado.FALLA,
+            "el servicio responde pero este sistema no expone el modo fijo de rendimiento")
+    }
+
     private fun probar(nombre: String, comando: String): Prueba {
         val r = shell.correr(comando)
         return when {
             r == null -> Prueba(nombre, Prueba.Estado.FALLA, "sin respuesta del gestor")
             r.codigo == 0 -> Prueba(nombre, Prueba.Estado.PASA,
                 if (r.texto.isBlank()) "responde sin error" else "«${r.texto.lineSequence().first().take(60)}»")
-            else -> Prueba(nombre, Prueba.Estado.FALLA,
-                "código ${r.codigo}: «${r.texto.take(80).ifBlank { "sin detalle" }}»")
+            // El «sin detalle» de antes no era falta de información: era que se lanzaba el
+            // comando sin `2>&1` y los mensajes de error iban a un sitio que no se leía.
+            else -> Prueba(nombre, Prueba.Estado.FALLA, "código ${r.codigo}: ${r.motivo}")
         }
     }
 

@@ -29,8 +29,25 @@ class Shell {
 
     fun disponible(): Boolean = servicio() != null
 
-    data class Salida(val codigo: Int, val texto: String) {
+    /**
+     * Lo que devolvió un comando.
+     *
+     * `codigo` es el del proceso. **`-1` no es un código de shell**: significa que se agotó el
+     * tiempo y se mató el proceso, o que no se pudo ni lanzar. Antes se devolvía `-1` como si
+     * fuera un código cualquiera y la pantalla decía «código -1», que no existe en ningún shell.
+     */
+    data class Salida(val codigo: Int, val texto: String, val seAgotoElTiempo: Boolean = false) {
         val ok: Boolean get() = codigo == 0
+        /** Qué contar cuando algo falló, sin inventarse nada. */
+        val motivo: String
+            get() = when {
+                seAgotoElTiempo -> "el comando no terminó en 8 s y se canceló"
+                codigo == -1 -> "el comando no llegó a ejecutarse"
+                texto.isNotBlank() -> texto.lineSequence().take(4).joinToString(" · ").take(160)
+                // Aquí estaba el «sin detalle»: se lanzaba con `sh -c` y los mensajes de error van
+                // por la salida de error, que no se estaba leyendo. Se tiraban a la basura.
+                else -> "salió con código $codigo pero no dijo por qué"
+            }
     }
 
     /**
@@ -41,7 +58,9 @@ class Shell {
         val s = servicio() ?: return null
         var pfd: ParcelFileDescriptor? = null
         return try {
-            val proceso = s.newProcess(arrayOf("sh", "-c", comando), null, null)
+            // `2>&1` no es un adorno: sin él, un comando que falla no dice nada. La salida de
+            // error es justo donde Android explica por qué se negó.
+            val proceso = s.newProcess(arrayOf("sh", "-c", "$comando 2>&1"), null, null)
             val codigo = try {
                 val hilo = Thread {
                     try { proceso.waitFor() } catch (_: Throwable) {}
@@ -57,7 +76,7 @@ class Shell {
                 FileInputStream(it.fileDescriptor).bufferedReader().readText()
             } ?: ""
             pfd?.close()
-            Salida(codigo, texto.trim())
+            Salida(codigo, texto.trim(), seAgotoElTiempo = codigo == -1)
         } catch (t: Throwable) {
             try { pfd?.close() } catch (_: Throwable) {}
             null

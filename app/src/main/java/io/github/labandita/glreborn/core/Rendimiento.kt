@@ -115,16 +115,20 @@ object Rendimiento {
             queHace = "Pide al sistema el modo de rendimiento sostenido (el mismo que activan " +
                 "algunos juegos). Gasta más batería y calienta más. Idea de «Performance Mode».",
             aplicar = listOf("cmd power set-fixed-performance-mode-enabled true"),
-            comprobar = "cmd power get-fixed-performance-mode-supported",
-            esperado = "true",
+            // La comprobación de antes era un comando **que no existe** (Android 13 sólo tiene
+            // set-mode, set-fixed-... y help): salía siempre código 255 y la acción parecía rota
+            // en todos los teléfonos. Lo que sí se puede leer es el ajuste que el sistema deja.
+            comprobar = "settings get global power_fixed_performance_mode_enabled",
+            esperado = "1",
             revertir = listOf("cmd power set-fixed-performance-mode-enabled false"),
             riesgo = Riesgo.MEDIO,
             necesitaRoot = false,
             inspirado = "Performance Mode · CPU Booster · AY Lightning Pro",
             androidMinimo = 29,
-            aviso = "La comprobación dice si tu teléfono lo SOPORTA, no si está activo: " +
-                "Android no expone una lectura del estado. Se aplica, se comprueba el " +
-                "soporte, y se dice tal cual.",
+            aviso = "Se comprueba el ajuste que el sistema escribe " +
+                "(`power_fixed_performance_mode_enabled`). Muchos fabricantes aceptan la orden y " +
+                "la ignoran: si el ajuste no cambia, la app te lo dirá en vez de dar por hecho " +
+                "que funcionó.",
         ),
         Accion(
             id = "thermal",

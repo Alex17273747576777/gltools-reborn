@@ -1623,6 +1623,67 @@ run {
         }
     }
 
+
+    // ── 1.9.8: dos fallos que el usuario vio en su teléfono ──────────────────
+    //
+    // «Modo rendimiento (cmd) código 255: Unknown command: get-fixed-performance-mode-supported»
+    // y «Escritura de propiedades código 1: <<sin detalle>>>».
+    //
+    // Los dos eran de la app, no del teléfono: uno usaba un comando que NO EXISTE en Android, y
+    // el otro tiraba a la basura la salida de error, que es justo donde Android explica el motivo.
+    println()
+    println("── comandos que existen y errores que se leen ──")
+    run {
+        val core = listOf("app/src/main/java/io/github/labandita/glreborn", "src/main/java/io/github/labandita/glreborn")
+            .map { java.io.File(it) }.firstOrNull { it.isDirectory }
+        if (core != null) {
+            val fuentes = core.walkTopDown().filter { it.extension == "kt" }.toList()
+            // Sin comentarios: la ley vigila el CÓDIGO. Un comentario que explica por qué un
+            // comando no existe es documentación, no una llamada.
+            val todo = fuentes.joinToString("\n") { f ->
+                f.readText().lines().filterNot { l ->
+                    val s = l.trimStart()
+                    s.startsWith("//") || s.startsWith("*") || s.startsWith("/*")
+                }.joinToString("\n")
+            }
+
+            // 1. Ningún comando inventado. `cmd power` sólo tiene set-mode, set-fixed-... y help.
+            check("la app no usa el subcomando inventado de `cmd power`",
+                !todo.contains("get-fixed-performance-mode-supported"))
+
+            // 2. Todo comando de shell va con stderr capturado: sin 2>&1 no se sabe por qué falló.
+            val shell = fuentes.firstOrNull { it.name == "Shell.kt" }
+            check("el shell captura la salida de error", shell != null && shell.readText().contains("2>&1"))
+
+            // 3. No se puede decir «sin detalle»: si no hay texto, hay código y hay motivo.
+            check("la app no se escuda en «sin detalle»", !todo.contains("\"sin detalle\""))
+            check("una salida sin texto explica al menos el código",
+                shell != null && shell.readText().contains("no dijo por qué"))
+
+            // 4. Una prueba que escribe TIENE que deshacer lo escrito: dejó una propiedad
+            //    inventada en el teléfono y el registro no la conocía, así que «Restaurar» no
+            //    sabía que tenía que devolverla.
+            val compat = fuentes.firstOrNull { it.name == "Compatibilidad.kt" }
+            check("la prueba de escritura se deshace", compat != null && compat.readText().contains("probarEscritura"))
+            if (compat != null) {
+                val c = compat.readText()
+                check("la prueba de escritura no toca una propiedad del sistema",
+                    !c.contains("setprop ro.product.marketname"))
+                check("después de escribir, vuelve a leer y restaura",
+                    c.contains("getprop $" + "clave") && c.contains("setprop $" + "clave"))
+            }
+
+            // 5. El modo rendimiento no se cree el código de salida: comprueba el efecto.
+            val sistema = fuentes.firstOrNull { it.name == "Sistema.kt" }
+            check("el modo rendimiento se verifica por el ajuste, no por el código",
+                sistema != null && sistema.readText().contains("power_fixed_performance_mode_enabled"))
+            if (sistema != null) {
+                check("y si el fabricante lo ignora, lo dice",
+                    sistema.readText().contains("no se puede prometer más"))
+            }
+        }
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")
