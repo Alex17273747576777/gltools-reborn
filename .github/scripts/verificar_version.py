@@ -9,6 +9,12 @@ import sys
 import zipfile
 
 CERTIFICADO = "1ff4c6ee90263a73a7ea6097de5b1f31bcd049c805e384904d2087b4c6c9e803"
+# La versión NO se escribe a mano aquí: se lee de build.gradle, que es de donde la toma Gradle.
+# Escribirla en dos sitios hizo que la 1.12.2 fallara la publicación con un APK correcto.
+sys.path.insert(0, str(Path(__file__).parent))
+from version_actual import leer as leer_version  # noqa: E402
+
+VERSION, CODIGO = leer_version()
 raiz = Path(sys.argv[1])
 sdk = Path(os.environ.get("ANDROID_HOME", os.environ.get("ANDROID_SDK_ROOT", "")))
 herramientas = sorted((sdk / "build-tools").glob("*/apksigner"), key=lambda p: tuple(int(n) for n in re.findall(r"\d+", p.parent.name)))
@@ -25,7 +31,8 @@ for apk in archivos:
     metadatos = subprocess.check_output([str(aapt), "dump", "badging", str(apk)], text=True)
     primera = metadatos.splitlines()[0]
     assert "name='io.github.labandita.glreborn'" in primera
-    assert "versionCode='25'" in primera and "versionName='1.12.1'" in primera
+    assert f"versionCode='{CODIGO}'" in primera, f"versionCode distinto de {CODIGO}: {primera}"
+    assert f"versionName='{VERSION}'" in primera, f"versionName distinto de {VERSION}: {primera}"
     firma = subprocess.run([str(apksigner), "verify", "--verbose", "--print-certs", str(apk)], text=True, capture_output=True)
     if firmado:
         assert firma.returncode == 0, "Firma APK inválida"
@@ -55,7 +62,7 @@ for apk in archivos:
 assert contenidos[0] == contenidos[1], "Los assets de ambas variantes deben ser idénticos"
 assert max(a['bytes'] for a in filas) > 3 * min(a['bytes'] for a in filas), "La variante sin comprimir no tiene el tamaño esperado"
 (raiz / "SHA256SUMS.txt").write_text("".join(f"{a['sha256']}  {a['nombre']}\n" for a in filas))
-datos = {"version": "1.12.1", "version_code": 25, "commit": os.environ["GITHUB_SHA"], "firmado": firmado,
+datos = {"version": VERSION, "version_code": CODIGO, "commit": os.environ["GITHUB_SHA"], "firmado": firmado,
          "certificado_sha256": CERTIFICADO if firmado else None, "apks": filas,
          "limites": "Sin prueba física, arranque ni garantía de compatibilidad del Power HAL."}
 (raiz / "verificacion.json").write_text(json.dumps(datos, indent=2) + "\n")

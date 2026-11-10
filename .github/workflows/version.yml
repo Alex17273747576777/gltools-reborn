@@ -25,6 +25,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Leer la version real de build.gradle
+        id: ver
+        run: python3 -B .github/scripts/version_actual.py
       - name: Probar lectura segura del JSON de firma
         run: python3 -B .github/scripts/test_preparar_firma.py
       - name: Preparar clave existente, nunca generar otra
@@ -44,16 +47,17 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/paquete"
           bash ./gradlew :app:pruebasNucleo :app:assembleRelease --no-daemon --console=plain
+          V="${{ steps.ver.outputs.nombre }}"
           if [ "$FIRMADO" = true ]; then
-            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-1.12.1.apk"
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-$V.apk"
           else
-            cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-1.12.1-UNSIGNED-NO-INSTALAR.apk"
+            cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-$V-UNSIGNED-NO-INSTALAR.apk"
           fi
           bash ./gradlew :app:clean :app:assembleRelease -PrebornDatos=crudo --no-daemon --console=plain
           if [ "$FIRMADO" = true ]; then
-            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-1.12.1-sin-comprimir.apk"
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-$V-sin-comprimir.apk"
           else
-            cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-1.12.1-sin-comprimir-UNSIGNED-NO-INSTALAR.apk"
+            cp app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/paquete/GLTools-Reborn-$V-sin-comprimir-UNSIGNED-NO-INSTALAR.apk"
           fi
       - name: Verificar paquete, version, certificado y hashes
         env:
@@ -99,5 +103,6 @@ jobs:
               assert pathlib.Path(a['nombre']).name == a['nombre']
               assert hashlib.sha256((p/a['nombre']).read_bytes()).hexdigest() == a['sha256']
           PYVERIFY
-          gh release create v1.12.1 --draft --target "$SHA" --title 'GLTools Reborn 1.12.1' --notes 'Corrige diagnóstico de propiedades y energía, validación shell y reversiones. Compilación y lógica verificadas; sin validación física ni garantía de modo fijo en cada ROM.' paquete/*.apk paquete/SHA256SUMS.txt paquete/verificacion.json
-          gh release edit v1.12.1 --draft=false --latest
+          V=$(python3 -B .github/scripts/version_actual.py | sed -E 's/.*VERSION_ACTUAL=([^ ]+).*/\1/')
+          gh release create "v$V" --draft --target "$SHA" --title "GLTools Reborn $V" --notes-file "docs/NOTAS-$V.md" paquete/*.apk paquete/SHA256SUMS.txt paquete/verificacion.json
+          gh release edit "v$V" --draft=false --latest
