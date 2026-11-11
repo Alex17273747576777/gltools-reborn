@@ -21,6 +21,7 @@ import io.github.labandita.glreborn.core.FichaAntutu
 import io.github.labandita.glreborn.core.Informe
 import io.github.labandita.glreborn.core.Medida
 import io.github.labandita.glreborn.core.PerfilDiagnostico
+import io.github.labandita.glreborn.core.ReglasDiagnostico
 
 /**
  * Auto-diagnóstico, ranking AnTuTu y modo penetración: tres pantallas, un solo idioma visual.
@@ -197,6 +198,63 @@ fun ContenidoDiagnostico(
             },
             nombres = listOf("Rápida", "Normal", "Larga"),
         )
+
+        // ── Qué pruebas se ejecutan. Desde la 1.14.0 el perfil se respeta de verdad, pero no había
+        //    manera de marcarlas: con menos de nueve pruebas sólo se llegaba importando un JSON a
+        //    mano. Filas con su hilo, como el resto de la pantalla: nada de una caja por prueba.
+        //    Se distingue «marcada» de «se ejecuta», porque con el perfil en rápido la RAM y la
+        //    escritura no corren por mucho que estén marcadas, y eso no se puede esconder.
+        Etiqueta("QUÉ PRUEBAS SE EJECUTAN")
+        val avisoPruebas = remember { androidx.compose.runtime.mutableStateOf("") }
+        val corren = ReglasDiagnostico.seleccion(perfil.pruebas, perfil.profundo)
+        ReglasDiagnostico.ETIQUETAS.forEach { entrada ->
+            val clave = entrada.first
+            val marcada = clave in perfil.pruebas
+            val corre = clave in corren
+            Fila(onClick = {
+                val (nuevo, aviso) = ReglasDiagnostico.alternar(perfil.pruebas, clave)
+                avisoPruebas.value = aviso
+                if (aviso.isBlank()) onPerfil(perfil.copy(pruebas = nuevo))
+            }) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        entrada.second.first,
+                        fontSize = 12.sp,
+                        color = if (corre) Cristal.texto else Cristal.textoTenue,
+                        fontWeight = if (corre) FontWeight.Medium else FontWeight.Normal,
+                    )
+                    Text(
+                        entrada.second.second,
+                        fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.textoSuave,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    when {
+                        corre -> "se ejecuta"
+                        marcada -> "marcada, no corre"
+                        else -> "no marcada"
+                    },
+                    fontSize = 11.sp,
+                    color = when {
+                        corre -> Cristal.marca
+                        marcada -> Cristal.ambar
+                        else -> Cristal.textoTenue
+                    },
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+            Hilo()
+        }
+        Text(
+            "${perfil.pruebas.size} de ${ReglasDiagnostico.ETIQUETAS.size} marcadas · " +
+                "${corren.size} se ejecutan con el perfil en " +
+                (if (perfil.profundo) "completo" else "rápido"),
+            fontSize = 11.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
+        )
+        if (avisoPruebas.value.isNotBlank()) {
+            Text("· ${avisoPruebas.value}", fontSize = 11.sp, lineHeight = 16.sp, color = Cristal.ambar)
+        }
 
         if (diag != null) {
             Etiqueta("RESULTADO DE LA ÚLTIMA MEDICIÓN")

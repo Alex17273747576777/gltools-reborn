@@ -2587,6 +2587,68 @@ run {
             RP.lineas(null).any { it.contains("SIN bloque de verificación") })
     }
 
+    // ── 1.15.0: las pruebas se pueden marcar, y las etiquetas no dicen más de lo que se mide ──
+    //
+    // En 1.14.0 el perfil por fin se respetaba, pero no había manera de marcar pruebas: con menos
+    // de nueve sólo se llegaba importando un JSON a mano. Un ajuste que existe en el código y no en
+    // la pantalla es un ajuste que no existe. Y al mirarlo salió otro hueco de la misma familia:
+    // «Guardar informe ahora» llamaba a `Informes.alCerrar` SIN el perfil, o sea que ese botón
+    // ejecutaba las nueve pruebas a 400 ms por mucho que el usuario hubiera elegido otra cosa.
+    println()
+    println("── 1.15.0 · casillas que marcan de verdad y etiquetas que no se pasan ──")
+    run {
+        val RD = io.github.labandita.glreborn.core.ReglasDiagnostico
+        val PD = io.github.labandita.glreborn.core.PerfilDiagnostico
+
+        val claves = RD.ETIQUETAS.map { it.first }
+        check("cada prueba tiene su etiqueta", claves.toSet() == PD.TODAS,
+            (PD.TODAS - claves.toSet()).toString())
+        check("y ninguna aparece dos veces", claves.size == claves.toSet().size)
+        check("ninguna etiqueta está en blanco",
+            RD.ETIQUETAS.all { it.second.first.isNotBlank() && it.second.second.isNotBlank() })
+        // Lo que más importa: que la descripción no prometa más de lo que la prueba hace.
+        check("la de red dice que es una estimación, no una medida",
+            RD.ETIQUETAS.first { it.first == PD.RED }.second.second.contains("estimación"))
+        check("la de CPU dice que no es la carga",
+            RD.ETIQUETAS.first { it.first == PD.CPU }.second.second.contains("no es la carga"))
+        check("la térmica dice que no son grados",
+            RD.ETIQUETAS.first { it.first == PD.TERMICO }.second.second.contains("no son grados"))
+        check("la RAM y la escritura dicen que sólo corren en completo",
+            RD.ETIQUETAS.first { it.first == PD.RAM }.second.second.contains("completo") &&
+                RD.ETIQUETAS.first { it.first == PD.IO }.second.second.contains("completo"))
+
+        val base = setOf(PD.MEMORIA, PD.CPU)
+        check("marcar añade la prueba", RD.alternar(base, PD.RED).first == base + PD.RED)
+        check("y no tiene nada que avisar", RD.alternar(base, PD.RED).second.isBlank())
+        check("desmarcar la quita", RD.alternar(base, PD.CPU).first == setOf(PD.MEMORIA))
+        check("una clave que no existe no entra", RD.alternar(base, "invento").first == base)
+        check("y se dice por qué", RD.alternar(base, "invento").second.contains("no es una prueba"))
+        check("no se puede dejar el perfil sin ninguna prueba",
+            RD.alternar(setOf(PD.MEMORIA), PD.MEMORIA).first == setOf(PD.MEMORIA))
+        check("y el control explica por qué no hizo caso",
+            RD.alternar(setOf(PD.MEMORIA), PD.MEMORIA).second.contains("sin medir nada"))
+
+        check("lo que se ejecuta es lo marcado, filtrado por el perfil",
+            RD.seleccion(RD.alternar(PD.TODAS, PD.RED).first, profundo = true) == PD.TODAS - PD.RED)
+        check("y en rápido la RAM y la escritura no corren aunque estén marcadas",
+            RD.seleccion(PD.TODAS, profundo = false).let { PD.RAM !in it && PD.IO !in it })
+
+        // El agujero de «Guardar informe ahora»: ningún alCerrar puede llamarse sin el perfil.
+        val mainArchivo = generateSequence(java.io.File("").absoluteFile) { it.parentFile }
+            .map { java.io.File(it, "app/src/main/java/io/github/labandita/glreborn/MainActivity.kt") }
+            .firstOrNull { it.exists() }
+        check("MainActivity está donde se le busca", mainArchivo != null,
+            java.io.File("").absolutePath)
+        if (mainArchivo != null) {
+            val texto = mainArchivo.readText()
+            val llamadas = Regex("alCerrar\\([^)]*\\)").findAll(texto).toList()
+            check("hay llamadas a Informes.alCerrar que comprobar", llamadas.isNotEmpty())
+            val sinPerfil = llamadas.filter { !it.value.contains("pruebas") }
+            check("ningún Informes.alCerrar se llama sin pasarle el perfil",
+                sinPerfil.isEmpty(), sinPerfil.map { it.value.take(90) }.toString())
+        }
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

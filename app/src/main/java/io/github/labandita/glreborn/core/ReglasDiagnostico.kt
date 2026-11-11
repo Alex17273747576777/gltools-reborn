@@ -151,4 +151,52 @@ object ReglasDiagnostico {
 
     /** Cuánto dura la prueba de CPU. El perfil lo elige (150/400/1000) y antes se ignoraba. */
     fun msCpu(msCpu: Int): Long = msCpu.coerceIn(50, 5000).toLong()
+
+    /*
+     * Cada clave con su nombre legible y lo que mide DE VERDAD. Van aquí, y no escritas a mano en
+     * la pantalla, por dos razones: se pueden probar, y la descripción no puede decir más de lo que
+     * hace la prueba. «Red» dice que es una estimación del sistema porque no se mide velocidad
+     * real; «RAM» y «IO» dicen que sólo corren con el perfil en completo porque es verdad.
+     */
+    val ETIQUETAS: List<Pair<String, Pair<String, String>>> = listOf(
+        PerfilDiagnostico.MEMORIA to ("Memoria disponible" to
+            "cuánta RAM queda libre ahora mismo, leído del sistema"),
+        PerfilDiagnostico.ALMACENAMIENTO to ("Almacenamiento libre" to
+            "espacio libre en la carpeta de datos, con StatFs"),
+        PerfilDiagnostico.BATERIA to ("Batería" to
+            "nivel, temperatura en grados, salud y si está cargando"),
+        PerfilDiagnostico.CPU to ("Velocidad de CPU" to
+            "operaciones por segundo en UN solo hilo: no es la carga de la CPU"),
+        PerfilDiagnostico.TERMICO to ("Estado y margen térmico" to
+            "el nivel que declara el sistema; no son grados"),
+        PerfilDiagnostico.VULKAN to ("Vulkan" to
+            "el nivel que declara el sistema, sin crear contexto de dibujo"),
+        PerfilDiagnostico.RED to ("Red" to
+            "la estimación del sistema sobre el enlace; no se mide velocidad real"),
+        PerfilDiagnostico.RAM to ("Velocidad de memoria" to
+            "copias de 4 MB; sólo corre con el perfil en «completo»"),
+        PerfilDiagnostico.IO to ("Escritura en almacenamiento" to
+            "4 MB con fsync; sólo corre con el perfil en «completo»"),
+    )
+
+    /**
+     * Marcar o desmarcar una prueba. Devuelve el conjunto nuevo y, si no se hizo lo que el usuario
+     * pidió, el motivo: un control que se niega en silencio es un control roto.
+     *
+     * No se deja quitar la última. `ReglasPerfilDiagnostico.validar` ya convertiría un perfil vacío
+     * en uno de sólo memoria, pero hacerlo ahí sería cambiarle el perfil al usuario sin decírselo;
+     * mejor se niega aquí y se explica.
+     */
+    fun alternar(pruebas: Set<String>, clave: String): Pair<Set<String>, String> {
+        if (clave !in PerfilDiagnostico.TODAS) {
+            return pruebas to "«$clave» no es una prueba de esta versión"
+        }
+        if (clave !in pruebas) return (pruebas + clave) to ""
+        val nuevo = pruebas - clave
+        return if (nuevo.isEmpty()) {
+            pruebas to "no se puede quitar la última prueba: el perfil se quedaría sin medir nada"
+        } else {
+            nuevo to ""
+        }
+    }
 }

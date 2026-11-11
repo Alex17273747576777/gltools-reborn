@@ -669,7 +669,12 @@ private fun App(
             alcance.launch {
                 val ctx = contexto.applicationContext
                 val r = withContext(Dispatchers.IO) {
-                    Informes.alCerrar(ctx, Build.VERSION_REBORN, perfilDiag.profundo, perfilDiag.conSonido)
+                    // 1.15.0: este botón también genera informe, y en 1.14.0 se quedó fuera del
+                    // arreglo: ejecutaba las nueve pruebas a 400 ms pasara lo que pasara en el
+                    // perfil. Un botón que ignora los ajustes es el mismo vicio que la 1.14.0 vino
+                    // a cerrar, sólo que en el otro sitio donde se genera el informe.
+                    Informes.alCerrar(ctx, Build.VERSION_REBORN, perfilDiag.profundo, perfilDiag.conSonido,
+                        perfilDiag.pruebas, perfilDiag.msCpu)
                 }
                 // Se enseña la ruta que devolvió el sistema, no la que se esperaba.
                 rutasInforme = r.rutas.map { it to "" } + r.fallos
