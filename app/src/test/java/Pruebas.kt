@@ -2540,7 +2540,9 @@ run {
         check("pero uno que desmarcó algo no recibe pruebas que no pidió",
             RPD.migrar(setOf(PD.MEMORIA, PD.CPU)) == setOf(PD.MEMORIA, PD.CPU))
         check("validar un perfil antiguo lo migra y lo dice",
-            RPD.validar(PD(pruebas = PD.TODAS_ANTERIORES)).let { par ->
+            RPD.validar(io.github.labandita.glreborn.core.PerfilDiagnostico(
+                pruebas = PD.TODAS_ANTERIORES,
+            )).let { par ->
                 par.first.pruebas == PD.TODAS && par.second.any { it.contains("térmica") } })
 
         // Procedencia: se lee el manifiesto REAL del APK, no una copia de mentira. Se busca subiendo
