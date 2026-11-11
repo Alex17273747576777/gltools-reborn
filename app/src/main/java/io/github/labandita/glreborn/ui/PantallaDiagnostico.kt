@@ -81,9 +81,9 @@ fun ContenidoDiagnostico(
             Modifier.fillMaxWidth(),
         ) { if (puedeCompartir) onCompartir() }
         Text(
-            "El informe se genera solo al cerrar la app, y también con «Guardar informe ahora». " +
-                "Se guarda en Documentos/GLTools Reborn y además se puede mandar por correo o " +
-                "mensajería: sale de tu teléfono sólo si tú eliges a dónde.",
+            io.github.labandita.glreborn.core.ReglasPromesas.destinoInforme(
+                android.os.Build.VERSION.SDK_INT, perfil.alCerrar,
+            ),
             fontSize = 11.sp, lineHeight = 17.sp, color = Cristal.textoSuave,
         )
 
@@ -278,8 +278,7 @@ fun ContenidoDiagnostico(
             }
         } else {
             Text(
-                "Todavía no se midió nada en esta sesión. Al cerrar la app se genera el informe " +
-                    "igual, con lo que haya en ese momento.",
+                io.github.labandita.glreborn.core.ReglasPromesas.informeAlCerrar(perfil.alCerrar),
                 fontSize = 13.sp, lineHeight = 19.sp, color = Cristal.textoSuave,
             )
         }

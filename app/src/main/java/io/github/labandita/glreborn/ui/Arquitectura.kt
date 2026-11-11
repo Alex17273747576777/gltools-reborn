@@ -168,8 +168,7 @@ object Estado {
         )
         if (modo == Modo.EXPERTO) lista += Par(
             "Modo experto activo",
-            "El modo experto toca API, versión de Android, huella y kernel. Cada escritura " +
-                "se anota antes de hacerla, y si la app muere a mitad se recupera al abrirla.",
+            io.github.labandita.glreborn.core.ReglasPromesas.recuperacionExperto(conVia),
             Banner.Tono.AVISO,
         )
         if (resumenCompat.contains("no funciona", true)) lista += Par(

@@ -3,7 +3,7 @@
 Un pendiente que vive en el chat se pierde. Éste es el sitio donde viven, con su criterio de
 cierre: no se tacha nada hasta que se cumpla lo que dice la columna «cierra cuando».
 
-Estado a 1.15.1 (versionCode 32, firmada con la clave original `1ff4c6ee…e803`).
+Estado a 1.16.0 (versionCode 33, firmada con la clave original `1ff4c6ee…e803`).
 
 ## Cerrado en 1.12.1
 
@@ -53,6 +53,15 @@ Estado a 1.15.1 (versionCode 32, firmada con la clave original `1ff4c6ee…e803`
 | Un informe corto no explicaba por qué era corto | `DiagnosticoCompleto.sinEjecutar` y una lista al final del informe con los nombres que ve el usuario. Desde 1.14.0 el perfil se respeta, y no aparecer no es lo mismo que decir por qué no está. |
 | Leer el estado térmico y sólo pintarlo | Si el sistema declara nivel 3 de 6 o peor, `avisos` lo dice, igual que con la memoria y la batería. El umbral vive en un solo sitio (`NIVEL_PREOCUPA`). |
 
+## Cerrado en 1.16.0
+
+| Pendiente | Cómo quedó |
+|---|---|
+| La interfaz prometía cosas que el código no hace | Se extrajeron las 78 frases visibles que afirmaban un comportamiento y se contrastaron con el código. Cinco mentían: el permiso de superposición «único» (falso en Android 13+), Shizuku como única vía y «sin él la app no puede hacer nada», el informe «se genera igual al cerrar» con `alCerrar` desactivado, «se guarda en Documentos» en Android 8 y 9, y la auto-reparación «al abrirla» sin vía. |
+| Las promesas no se podían probar | Nace `core/ReglasPromesas.kt`, puro: cada frase sale de los hechos de los que depende (nivel de API, ajuste del perfil, si hay vía). Una frase escrita a mano no se prueba; una derivada de un hecho, sí. |
+| Nada impedía que una frase falsa volviera | Hay una comprobación que escanea el fuente de `ui/` y falla si reaparece cualquiera de las cinco. |
+| No estaba dicho qué promesas sí son verdad | Cinco se comprobaron y resultaron ciertas (comando de vuelta desacoplado, anotación antes de escribir, borrado del parte, posición persistente, modo que sobrevive al arranque). Quedan anotadas en el KDoc para que nadie las «arregle» sin mirar. |
+
 ## Abiertos, por orden de trabajo
 
 | # | Pendiente | Cierra cuando |
@@ -65,6 +74,7 @@ Estado a 1.15.1 (versionCode 32, firmada con la clave original `1ff4c6ee…e803`
 | 6 | Aplicación **profunda y verificada**, sin simulaciones parciales: se comprueba el efecto leyendo después de escribir, y lo que no se puede leer se declara. | `Ejecutor`, `Sistema` y `Apps` ya leían de vuelta antes de decir «aplicado»; el agujero que quedaba era el clasificador de penetración, cerrado en 1.13.2. Falta la comprobación en teléfono → pendiente 9. |
 | 7 | Modo de penetración de sistema (qué se puede y qué no sin root real). | **Cerrado en código en 1.13.2**: el clasificador exige código de salida y las sondas que escriben restauran lo que había. Sigue sin probarse en un teléfono real → eso es el pendiente 9. Nada de `persist.sys.*` inventado, `rc.local` ni Device Owner como si dieran root. |
 | 8 | Importación del catálogo sorteando el bloqueo del sitio (sin bots). | **Premisa corregida en 1.14.0**: el catálogo que viaja en el APK NO viene de un sitio bloqueado, viene del CSV oficial de Google Play (`storage.googleapis.com/play_public/supported_devices.csv`), que se descarga sin problema y cuyo hash quedó guardado en el manifiesto. Lo que sí estaba bloqueado (versus.com, desafío anti-bot en su `robots.txt`) sigue sin rastrearse y está declarado en `fuentes_no_usadas`. No se sortea ningún bloqueo. |
+| 11 | **Contrastar el resto de frases de la interfaz.** En 1.16.0 se auditaron sólo las que **afirman** un comportamiento (78). Las que describen —nombres de pruebas, unidades, títulos, ayudas— no se revisaron, y el mismo género de defecto puede estar ahí. | Hay una pasada equivalente sobre las frases descriptivas, o se dice explícitamente que no la va a haber. |
 | 9 | **Verificar en un teléfono real** que compartir abre el selector y entrega el `.md` y el `.txt`, y que el informe se escribe de verdad en Documentos. | Hay una captura o un registro del teléfono, no sólo pruebas de JVM. Todo lo cerrado en 1.13.1 está probado en código, no en dispositivo: hasta que no haya teléfono, eso es lo que se puede afirmar. **Primera evidencia de dispositivo en 1.15.1**: un usuario instaló la 1.14.0 y reportó que el estado térmico salía raro; eso destapó tres defectos reales. Sigue sin ser una verificación completa —no hay modelo, nivel de API ni texto exacto— y falta confirmar en su pantalla que el arreglo se ve bien. |
 | 10 | Casillas en la interfaz para elegir qué pruebas se ejecutan. | **Cerrado en código en 1.15.0**: la pantalla permite marcar cada una de las nueve, una prueba JVM demuestra que lo marcado es exactamente lo que `seleccion` devuelve, y `MainActivity.kt` queda vigilado para que ningún `alCerrar` vuelva a llamarse sin el perfil. Falta la comprobación en teléfono → pendiente 9. |
 

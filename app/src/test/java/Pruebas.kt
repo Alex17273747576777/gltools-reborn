@@ -2721,6 +2721,89 @@ run {
             !md.lines().any { it.contains("Estado térmico") && it.contains("░") })
     }
 
+    // ── 1.16.0: caza de promesas rotas en la interfaz ──
+    //
+    // Se leyeron las 78 frases visibles que afirmaban un comportamiento y se contrastaron una a una
+    // con el código. Cinco decían algo que el código no hace. El arreglo no es reescribirlas a mano,
+    // que es exactamente como se rompieron: ahora salen de los hechos de los que dependen, y aquí se
+    // prueban esos hechos. Y se escanea el fuente para que las frases falsas no vuelvan.
+    println()
+    println("── 1.16.0 · las promesas salen de hechos, y se prueban ──")
+    run {
+        val RP = io.github.labandita.glreborn.core.ReglasPromesas
+
+        check("en Android 12 la superposición sí necesita un solo permiso",
+            RP.permisosSuperposicion(32).contains("único"))
+        val trece = RP.permisosSuperposicion(33)
+        check("en Android 13 se nombra el permiso de notificaciones", trece.contains("notificaciones"), trece)
+        check("y ahí ya no se dice que sea el único", !trece.contains("único"))
+        check("se dice qué pasa si no se da: la capa funciona, el aviso no se ve",
+            trece.contains("sigue funcionando") && trece.contains("no se ve"))
+        check("el umbral es la API 33, que es donde Android lo pide en runtime", RP.API_NOTIFICACIONES == 33)
+        check("el aviso de debajo cuenta lo mismo en Android 13",
+            RP.avisoSuperposicion(33).contains("el aviso no se ve"))
+        check("y en Android 12 no inventa un permiso que allí no se pide",
+            !RP.avisoSuperposicion(32).contains("no se ve"))
+
+        val sh = RP.permisoShizuku()
+        check("Shizuku ya no se presenta como la única vía", sh.contains("root"), sh)
+        check("no se afirma que sin él la app no pueda hacer nada", !sh.contains("no puede hacer nada"))
+        check("y se dice lo que sí funciona sin vía", sh.contains("leer y buscar"))
+
+        check("con el informe al cerrar activo sí se promete el informe",
+            RP.informeAlCerrar(true).contains("Al cerrar la app se genera"))
+        val sinInforme = RP.informeAlCerrar(false)
+        check("con el ajuste desactivado no se promete nada",
+            !sinInforme.contains("Al cerrar la app se genera"), sinInforme)
+        check("y se dice por qué, y qué hacer en su lugar",
+            sinInforme.contains("desactivado") && sinInforme.contains("Guardar informe ahora"))
+
+        check("en Android 10 o más el informe va a Documentos",
+            RP.destinoInforme(29, true).contains("Documentos/GLTools Reborn"))
+        check("en Android 9 no se promete Documentos",
+            !RP.destinoInforme(28, true).contains("Documentos/GLTools Reborn"))
+        check("en Android 9 se dice la verdad: carpeta de la app y ruta exacta",
+            RP.destinoInforme(28, true).let { it.contains("carpeta de la app") && it.contains("ruta exacta") })
+        check("el umbral de Documentos es la API 29", RP.API_DOCUMENTOS == 29)
+        check("y si el perfil no genera al cerrar, tampoco se promete ahí",
+            !RP.destinoInforme(34, false).contains("se genera solo al cerrar"))
+
+        check("con vía, la auto-reparación sí se promete",
+            RP.recuperacionExperto(true).contains("se devuelve sola"))
+        val sinVia = RP.recuperacionExperto(false)
+        check("sin vía no se promete: se dice que espera a que la haya",
+            !sinVia.contains("se devuelve sola") && sinVia.contains("en cuanto haya vía"), sinVia)
+        check("y se explica que sin vía no se puede escribir ni para deshacer",
+            sinVia.contains("tampoco para deshacer"))
+        check("las dos variantes dicen que se anota antes de escribir",
+            RP.recuperacionExperto(true).contains("se anota antes") && sinVia.contains("se anota antes"))
+
+        // Que las frases falsas no vuelvan a aparecer escritas a mano en ninguna pantalla.
+        val carpetaUi = generateSequence(java.io.File("").absoluteFile) { it.parentFile }
+            .map { java.io.File(it, "app/src/main/java/io/github/labandita/glreborn/ui") }
+            .firstOrNull { it.exists() && it.isDirectory }
+        check("se encuentra la carpeta de la interfaz", carpetaUi != null, java.io.File("").absolutePath)
+        if (carpetaUi != null) {
+            val fuentes = carpetaUi.listFiles()?.filter { it.name.endsWith(".kt") } ?: emptyList()
+            check("hay fuentes de interfaz que leer", fuentes.isNotEmpty(), fuentes.size.toString())
+            val falsas = listOf(
+                "Es el único permiso que ",
+                "Solo Shizuku puede concederlo",
+                "Al cerrar la app se genera el informe ",
+                "Se guarda en Documentos/GLTools Reborn",
+                "se recupera al abrirla",
+            )
+            val quedan = fuentes.flatMap { f ->
+                val t = f.readText()
+                falsas.filter { t.contains(it) }.map { f.name + " → " + it }
+            }
+            check("ninguna pantalla vuelve a prometer en falso", quedan.isEmpty(), quedan.toString())
+            val usanReglas = fuentes.filter { it.readText().contains("ReglasPromesas.") }.map { it.name }
+            check("las pantallas que prometían algo pasan ahora por ReglasPromesas",
+                usanReglas.size >= 4, usanReglas.toString())
+        }
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

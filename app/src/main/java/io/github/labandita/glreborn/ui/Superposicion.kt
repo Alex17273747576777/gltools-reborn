@@ -50,8 +50,9 @@ fun PantallaSuperposicion(
         Grupo(rotulo = "CÓMO SE USA") {
             Column(Modifier.fillMaxWidth().padding(14.dp)) {
                 listOf(
-                    "1" to "Dale permiso de dibujar encima de otras apps. Es el único permiso que " +
-                        "necesita y se lo puedes quitar cuando quieras.",
+                    "1" to io.github.labandita.glreborn.core.ReglasPromesas.permisosSuperposicion(
+                        android.os.Build.VERSION.SDK_INT,
+                    ),
                     "2" to "Actívala. Aparece un punto de mira y un contador de FPS, sin tapar los toques: " +
                         "el juego recibe los dedos como si no estuviera.",
                     "3" to "Abre el juego. Si algo no cuadra, arrástrala: se queda donde la dejes.",
@@ -257,9 +258,9 @@ fun PantallaSuperposicion(
 
         Spacer(Modifier.height(12.dp))
         Text(
-            "Ni root ni Shizuku: esto usa la API pública de superposiciones de Android. " +
-                "Mientras está encendido verás una notificación fija con el botón «Quitar»: " +
-                "Android no permite dibujar encima de la pantalla en silencio, y hace bien.",
+            io.github.labandita.glreborn.core.ReglasPromesas.avisoSuperposicion(
+                android.os.Build.VERSION.SDK_INT,
+            ),
             fontSize = 9.5.sp, lineHeight = 14.sp, color = Cristal.textoSuave,
         )
     }

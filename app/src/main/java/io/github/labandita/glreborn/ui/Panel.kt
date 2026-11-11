@@ -161,8 +161,7 @@ object PanelAssets {
  */
 fun explicarPermiso(permiso: String): String = when {
     permiso.contains("shizuku") ->
-        "Deja que GLTools pida permiso a Shizuku para ejecutar órdenes de shell. " +
-            "Solo Shizuku puede concederlo; sin él la app no puede hacer nada."
+        io.github.labandita.glreborn.core.ReglasPromesas.permisoShizuku()
     permiso.contains("QUERY_ALL_PACKAGES") ->
         "Ver la lista completa de apps instaladas, incluidas las que no tienen icono. " +
             "Sin esto, algunas apps no se podrían congelar."
