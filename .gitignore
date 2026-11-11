@@ -5,6 +5,11 @@ FIRMA.txt
 local.properties
 .gradle/
 build/
+# Bytecode de Python: se generó en el runner y acabó versionado en .github/scripts/.
+# Ni ése ni ninguno: lo compilado no es fuente, y un .pyc puede no corresponder a su .py.
+__pycache__/
+*.pyc
+*.pyo
 # El APK de release sí se publica: es el entregable. El de debug no.
 apk/*.apk
 !apk/GLToolsReborn-*-release.apk

@@ -36,7 +36,35 @@ jobs:
           # aquí también, para que nadie la relaje sin darse cuenta.
           prov = Path('app/src/main/java/io/github/labandita/glreborn/core/ProveedorInformes.kt').read_text()
           assert 'reborn-[a-z0-9_-]+' in prov
+          # 1.13.1: cuando el nombre no cumplía el filtro, compartir caía en Uri.fromFile. Con
+          # targetSdk 35 eso es FileUriExposedException: la app se cierra al pulsar compartir.
+          assert 'fromFile' not in prov, 'file:// fuera de la app revienta en Android 7 o mas'
+          assert 'ultimosInformes' in prov, 'compartir debe mirar la carpeta de la app'
           PY
+      - name: La version del registro es la del build.gradle
+        run: |
+          python3 -B - <<'PY'
+          import re
+          from pathlib import Path
+          g = Path('app/build.gradle').read_text(encoding='utf-8')
+          k = Path('app/src/main/java/io/github/labandita/glreborn/RegistroFallos.kt').read_text(encoding='utf-8')
+          del_gradle = re.search(r'versionName\s+"([^"]+)"', g).group(1)
+          del_registro = re.search(r'VERSION_REBORN\s*=\s*"([^"]+)"', k).group(1)
+          assert del_gradle == del_registro, 'VERSION_REBORN=' + del_registro + ' pero build.gradle dice ' + del_gradle
+          print('VERSION_COHERENTE=' + del_gradle)
+          PY
+
+      - name: Ni bytecode ni claves versionadas
+        run: |
+          python3 -B - <<'PY'
+          import subprocess
+          ficheros = subprocess.run(['git', 'ls-files'], capture_output=True, text=True).stdout.split()
+          prohibidos = [f for f in ficheros
+                        if f.endswith(('.pyc', '.pyo', '.jks', '.keystore')) or '__pycache__' in f]
+          assert not prohibidos, 'basura versionada: ' + str(prohibidos)
+          print('FICHEROS_VERSIONADOS=' + str(len(ficheros)))
+          PY
+
       - name: Probar esquema de firma sin secretos
         run: python3 -B .github/scripts/test_preparar_firma.py
       - name: Compilar y probar el núcleo

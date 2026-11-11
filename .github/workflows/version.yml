@@ -65,7 +65,7 @@ jobs:
       - name: Verificar paquete, version, certificado y hashes
         env:
           FIRMADO: ${{ steps.clave.outputs.firmado }}
-        run: python3 .github/scripts/verificar_version.py "$RUNNER_TEMP/paquete"
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -B .github/scripts/verificar_version.py "$RUNNER_TEMP/paquete"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.clave.outputs.artefacto }}

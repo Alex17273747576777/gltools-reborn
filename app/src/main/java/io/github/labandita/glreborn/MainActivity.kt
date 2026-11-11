@@ -287,6 +287,13 @@ private fun App(
     var panelDe by remember { mutableStateOf<String?>(null) }
     var appPanel by remember { mutableStateOf<Inventario.App?>(null) }
     val alcance = rememberCoroutineScope()
+    /*
+      1.13.1 · compartir tiene que funcionar al abrir la app, no sólo en la sesión en la que se
+      generó el informe. `Informes.ultimas()` vive en memoria: si el proceso muere se pierde, y
+      el botón decía «aún no hay informe que compartir» con los informes en disco. Se mira una
+      vez al componer la pantalla; `Compartir.para` vuelve a mirar cuando se pulsa.
+    */
+    var informesEnDisco by remember { mutableStateOf(Compartir.hayInformes(contexto)) }
 
     /**
      * Relee el estado del teléfono FUERA del hilo de interfaz.
@@ -635,7 +642,8 @@ private fun App(
             avisosPerfiles = listOfNotNull(aviso)
             PerfilesDiagnosticoJson(contexto).guardar(nuevos)
         },
-        puedeCompartirInforme = informeReciente.isNotEmpty() || Informes.ultimas().isNotEmpty(),
+        puedeCompartirInforme = informeReciente.isNotEmpty() || Informes.ultimas().isNotEmpty() ||
+            informesEnDisco,
         onCompartirInforme = {
             val rutas = informeReciente.ifEmpty { Informes.ultimas() }
             val intent = Compartir.para(contextoActividad, rutas)
@@ -658,6 +666,9 @@ private fun App(
                 // Se enseña la ruta que devolvió el sistema, no la que se esperaba.
                 rutasInforme = r.rutas.map { it to "" } + r.fallos
                 informeReciente = r.rutas
+                // La copia interna ya está escrita: el botón se activa con ella aunque lo que
+                // devolvió MediaStore sea una etiqueta y no una ruta.
+                informesEnDisco = Compartir.hayInformes(ctx)
                 resultado = if (r.huboArchivos && r.fallos.isEmpty())
                     Resultado(true, Via.NINGUNA, "Informes guardados: " + r.rutas.joinToString(" · "))
                 else if (r.huboArchivos)

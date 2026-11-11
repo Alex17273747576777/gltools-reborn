@@ -72,9 +72,11 @@ object Informes {
                 context.contentResolver.openOutputStream(uri)?.use {
                     it.write(contenido.toByteArray())
                 } ?: return@runCatching "" to "no se pudo abrir el archivo para escribir"
-                // Después de escribir: si no se cierra la transacción, en algunos teléfonos el
-                // archivo aparece con 0 bytes hasta que se reinicia la galería del sistema.
-                ""
+                // El `use` cierra el flujo y eso es lo que confirma la fila de MediaStore: sin
+                // cerrar, en algunos teléfonos el archivo se queda en 0 bytes. Lo que se
+                // devuelve es una ETIQUETA legible, no una ruta: en Android 10 o más la ruta
+                // real no es accesible para la app, y tratarla como si lo fuera fue lo que
+                // rompió el botón de compartir en la 1.12.2 y la 1.13.0.
                 "Documentos/GLTools Reborn/$nombre" to ""
             } else {
                 val carpeta = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
@@ -154,6 +156,15 @@ object Informes {
         ultimasRutas = listOfNotNull(
             rutaMd.ifBlank { null }, rutaTxt.ifBlank { null }, internoMd, internoTxt,
         ).distinct()
+        /*
+          La copia interna se escribe siempre, así que sin límite la carpeta de la app se llena
+          de informes viejos con datos del teléfono. Se conservan las cinco últimas tandas y el
+          resto se borra. Fallar aquí no puede impedir que el informe salga: por eso va envuelto.
+        */
+        runCatching {
+            val enCarpeta = context.filesDir.listFiles()?.toList() ?: emptyList()
+            ReglasInformes.sobrantes(enCarpeta, conservar = 5).forEach { it.delete() }
+        }
 
         if (rutaMd.isNotBlank() || rutaTxt.isNotBlank()) {
             avisar(

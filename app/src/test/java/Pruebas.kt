@@ -2197,6 +2197,89 @@ run {
     }
 
 
+    // ── 1.13.1: compartir no se puede fiar de las "rutas" que devuelve MediaStore ────────
+    //
+    // Fallo real de la 1.12.2 y la 1.13.0, encontrado leyendo el código: en Android 10 o más
+    // `Informes.guardar` devuelve "Documentos/GLTools Reborn/reborn-….md", que es una etiqueta
+    // para enseñar al usuario, no una ruta. `Compartir.para` filtraba esas cadenas con
+    // `File(ruta).isFile`, todo daba falso, y el botón respondía "no hay ningún informe en
+    // disco que compartir" justo después de haberlo escrito. Aquí se reproduce con ficheros de
+    // verdad en una carpeta temporal: sin Android delante, que es como se puede probar esto.
+    println()
+    println("── 1.13.1 · compartir con etiquetas de MediaStore ──")
+    run {
+        val R = io.github.labandita.glreborn.core.ReglasInformes
+        val carpeta = java.nio.file.Files.createTempDirectory("informes").toFile()
+        try {
+            val viejo = "2026-11-01_09-00"
+            val nuevo = "2026-11-10_20-47"
+            val md = java.io.File(carpeta, "reborn-diagnostico-$nuevo.md")
+            val txt = java.io.File(carpeta, "reborn-errores-$nuevo.txt")
+            val viejoMd = java.io.File(carpeta, "reborn-diagnostico-$viejo.md")
+            val viejoTxt = java.io.File(carpeta, "reborn-errores-$viejo.txt")
+            val intruso = java.io.File(carpeta, "otra-cosa.md")
+            listOf(md, txt, viejoMd, viejoTxt, intruso).forEach { it.writeText("x") }
+            // Fechas a mano: la resolución del sistema de ficheros puede ser demasiado basta.
+            viejoMd.setLastModified(1_000_000L)
+            viejoTxt.setLastModified(1_000_000L)
+            md.setLastModified(2_000_000L)
+            txt.setLastModified(2_000_000L)
+            intruso.setLastModified(3_000_000L)
+
+            val todos = carpeta.listFiles()!!.toList()
+            val ultimos = R.ultimos(todos)
+            check("la tanda más reciente son su .md y su .txt",
+                ultimos.map { it.name } == listOf(
+                    "reborn-diagnostico-$nuevo.md", "reborn-errores-$nuevo.txt"),
+                ultimos.joinToString())
+            check("un fichero que no es informe no entra aunque sea el más nuevo",
+                ultimos.none { it.name == "otra-cosa.md" })
+
+            // El fallo concreto: una etiqueta de MediaStore NO es un fichero.
+            val etiqueta = "Documentos/GLTools Reborn/reborn-diagnostico-$nuevo.md"
+            check("la etiqueta de MediaStore no es un fichero (ése era el fallo)",
+                !java.io.File(etiqueta).isFile)
+            check("pero de la etiqueta se saca el nombre servible",
+                R.servible(etiqueta) == "reborn-diagnostico-$nuevo.md")
+            check("y ese nombre, resuelto en la carpeta de la app, sí es un informe",
+                R.esInforme(java.io.File(carpeta, R.servible(etiqueta)!!)))
+            check("una ruta real de Android 8 y 9 también da el nombre",
+                R.servible("/storage/emulated/0/Android/data/x/files/Documents/reborn-errores-$nuevo.txt") ==
+                    "reborn-errores-$nuevo.txt")
+            check("lo que no es informe no se sirve", R.servible("$etiqueta.xml") == null)
+            check("subir de carpeta no lleva a otro sitio",
+                R.servible("../reborn-diagnostico-$nuevo.md") == "reborn-diagnostico-$nuevo.md" &&
+                    !R.servible("../reborn-diagnostico-$nuevo.md")!!.contains("/"))
+
+            // Limpieza: se conservan tandas, no ficheros sueltos.
+            check("lo que sobra es la tanda vieja entera",
+                R.sobrantes(todos, conservar = 1).map { it.name } == listOf(
+                    "reborn-diagnostico-$viejo.md", "reborn-errores-$viejo.txt"),
+                R.sobrantes(todos, 1).joinToString())
+            check("conservando más tandas de las que hay no se borra nada",
+                R.sobrantes(todos, 5).isEmpty())
+            check("y un fichero que no es informe no se borra nunca",
+                R.sobrantes(todos, 1).none { it.name == "otra-cosa.md" })
+
+            // El sello identifica la tanda: los dos ficheros de una medición comparten sello.
+            check("el .md y el .txt de una tanda comparten sello",
+                R.selloDe("reborn-diagnostico-$nuevo.md") == R.selloDe("reborn-errores-$nuevo.txt"))
+            check("un nombre cualquiera no tiene sello", R.selloDe("otra-cosa.md") == null)
+
+            // La fuente ya no construye file://, que en Android 7+ cierra la app al compartir.
+            val provFuente = listOf(
+                "app/src/main/java/io/github/labandita/glreborn/core/ProveedorInformes.kt",
+                "src/main/java/io/github/labandita/glreborn/core/ProveedorInformes.kt",
+            ).map { java.io.File(it) }.firstOrNull { it.exists() }
+            check("compartir ya no construye file:// (FileUriExposedException)",
+                provFuente != null && !provFuente.readText().contains("fromFile"))
+        } finally {
+            carpeta.listFiles()?.forEach { it.delete() }
+            carpeta.delete()
+        }
+    }
+
+
     // ── 1.13.0: perfiles de diagnóstico personalizados, en JSON ──────────────
     //
     // Lo que había: UN perfil, en `clave=valor`, sin nombre, y los umbrales se enseñaban pero no
