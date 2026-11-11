@@ -2115,11 +2115,11 @@ run {
         val deEscribir = rpen.PRUEBAS.filter { it.second.contains("settings put") || it.second.contains("setprop") }
         check("hay sondas que escriben", deEscribir.isNotEmpty(), deEscribir.size.toString())
         check("todas leen el valor previo antes de escribir", deEscribir.all { it.second.contains("prev=") })
-        check("y todas lo restauran después", deEscribir.all { it.second.contains("\"$prev\"") })
+        check("y todas lo restauran después", deEscribir.all { it.second.contains("\"\$prev\"") })
         check("la de ajustes globales borra la clave si antes no existía",
             deEscribir.any { it.second.contains("settings delete global reborn_prueba") })
         check("el código de salida es el de la escritura, no el del eco",
-            deEscribir.all { it.second.trimEnd().endsWith("exit $rc") })
+            deEscribir.all { it.second.trimEnd().endsWith("exit \$rc") })
         check("ninguna sonda escribe una propiedad que SELinux prohíbe sin root",
             deEscribir.none { it.second.contains("persist.reborn") })
         // Ningún nombre promete más de lo que su comando prueba de verdad.
