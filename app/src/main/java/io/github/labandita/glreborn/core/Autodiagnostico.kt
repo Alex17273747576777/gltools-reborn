@@ -31,8 +31,21 @@ data class Medida(
     val unidad: String,
     val detalle: String,
     val motivoSinDato: String = "",
+    /**
+     * Cuando lo leído es una CATEGORÍA y no una cantidad, se dice con palabras aquí.
+     *
+     * Existía [valor] y nada más, y en 1.14.0 metí el estado térmico ahí como nivel 0-6. La pantalla
+     * hizo lo que tenía que hacer con un número: dibujó una barra vacía y «0.00 nivel 0-6», que se
+     * lee como si no hubiera nada cuando el sistema acababa de decir «sin estrangulamiento». Un
+     * estado no se mide, se declara, y se enseña con palabras. Las cantidades siguen con su número y
+     * su barra.
+     */
+    val texto: String = "",
 ) {
     val medida: Boolean get() = valor != null
+
+    /** Si hay que enseñarla con palabras en vez de con número y barra. */
+    val esCategoria: Boolean get() = texto.isNotBlank()
 }
 
 /** Lo que se midió, con la hora y el teléfono en que se midió. */
@@ -42,6 +55,13 @@ data class DiagnosticoCompleto(
     val equipo: List<Pair<String, String>>,
     val medidas: List<Medida>,
     val errores: List<String>,
+    /**
+     * Las pruebas que el perfil dejó fuera. Desde 1.14.0 el perfil se respeta de verdad, y eso tiene
+     * un efecto que hasta 1.15.1 no se decía: una prueba desmarcada no aparece en el informe, y no
+     * aparecer no es lo mismo que decir «no se ejecutó porque tú no la marcaste». Sin esta lista, un
+     * informe corto se parece mucho a un informe que no midió.
+     */
+    val sinEjecutar: List<String> = emptyList(),
 )
 
 object Autodiagnostico {
@@ -166,25 +186,44 @@ object Autodiagnostico {
      * (API 30). NO son grados. La temperatura de la batería sí son grados y va en [bateria]; la de
      * la CPU no tiene API pública y [temperaturaCpu] lo declara en vez de suponerla.
      */
-    fun termico(context: Context): List<Medida> {
+    fun termico(context: Context, errores: MutableList<String> = mutableListOf()): List<Medida> {
         val api = Build.VERSION.SDK_INT
         val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-        val etiqueta = if (api >= 29 && pm != null) runCatching {
-            when (pm.currentThermalStatus) {
-                PowerManager.THERMAL_STATUS_NONE -> "NONE"
-                PowerManager.THERMAL_STATUS_LIGHT -> "LIGHT"
-                PowerManager.THERMAL_STATUS_MODERATE -> "MODERATE"
-                PowerManager.THERMAL_STATUS_SEVERE -> "SEVERE"
-                PowerManager.THERMAL_STATUS_CRITICAL -> "CRITICAL"
-                PowerManager.THERMAL_STATUS_EMERGENCY -> "EMERGENCY"
-                PowerManager.THERMAL_STATUS_SHUTDOWN -> "SHUTDOWN"
-                else -> "OTRO(${pm.currentThermalStatus})"
+        // Se captura la excepción por separado a propósito. Envolverlo todo en un getOrNull()
+        // convertía «el fabricante lanzó un fallo» en «el sistema no devolvió nada», que es afirmar
+        // lo que no se sabe y además esconde que la API falló en este aparato.
+        var falloEstado = ""
+        val etiqueta = if (api >= 29 && pm != null) {
+            try {
+                when (pm.currentThermalStatus) {
+                    PowerManager.THERMAL_STATUS_NONE -> "NONE"
+                    PowerManager.THERMAL_STATUS_LIGHT -> "LIGHT"
+                    PowerManager.THERMAL_STATUS_MODERATE -> "MODERATE"
+                    PowerManager.THERMAL_STATUS_SEVERE -> "SEVERE"
+                    PowerManager.THERMAL_STATUS_CRITICAL -> "CRITICAL"
+                    PowerManager.THERMAL_STATUS_EMERGENCY -> "EMERGENCY"
+                    PowerManager.THERMAL_STATUS_SHUTDOWN -> "SHUTDOWN"
+                    else -> "OTRO(${pm.currentThermalStatus})"
+                }
+            } catch (t: Throwable) {
+                falloEstado = "${t.javaClass.simpleName}: ${t.message}"
+                errores += "estado térmico: $falloEstado"
+                null
             }
-        }.getOrNull() else null
-        val margen = if (api >= 30 && pm != null) runCatching { pm.getThermalHeadroom(10) }.getOrNull() else null
+        } else null
+        var falloMargen = ""
+        val margen = if (api >= 30 && pm != null) {
+            try {
+                pm.getThermalHeadroom(10)
+            } catch (t: Throwable) {
+                falloMargen = "${t.javaClass.simpleName}: ${t.message}"
+                errores += "margen térmico: $falloMargen"
+                null
+            }
+        } else null
         return listOf(
-            ReglasDiagnostico.termico(etiqueta, api),
-            ReglasDiagnostico.margenTermico(margen, api),
+            ReglasDiagnostico.termico(etiqueta, api, falloEstado),
+            ReglasDiagnostico.margenTermico(margen, api, falloMargen),
         )
     }
 
@@ -362,7 +401,7 @@ object Autodiagnostico {
             // La temperatura de la CPU no se puede medir y se declara; el estado térmico sí.
             intentar("cpu-temperatura") { temperaturaCpu(context) }
             try {
-                termico(context).forEach { medidas += it }
+                termico(context, errores).forEach { medidas += it }
             } catch (t: Throwable) {
                 errores += "térmico: ${t.javaClass.simpleName}: ${t.message}"
                 medidas += Medida(ReglasDiagnostico.NOMBRE_TERMICO, null, "", "",
@@ -382,6 +421,7 @@ object Autodiagnostico {
             equipo = equipo(context),
             medidas = medidas,
             errores = errores,
+            sinEjecutar = ReglasDiagnostico.noElegidas(pruebas, profundo),
         )
     }
 }
@@ -423,9 +463,16 @@ object Informe {
             appendLine("| Prueba | Valor | Unidad | Cómo se obtuvo |")
             appendLine("|---|---:|---|---|")
             d.medidas.forEach { m ->
+                // Una categoría va con palabras: en 1.14.0 el estado térmico salía aquí como «0.00»
+                // con unidad «nivel 0-6», que se lee como si no hubiera dato.
+                val valor = when {
+                    m.esCategoria -> escapar(m.texto)
+                    m.valor != null -> formato(m.valor!!)
+                    else -> "no medido"
+                }
                 appendLine(
-                    "| ${escapar(m.nombre)} | ${m.valor?.let { formato(it) } ?: "no medido"} | " +
-                        "${m.unidad} | ${escapar(m.detalle.ifBlank { m.motivoSinDato })} |",
+                    "| ${escapar(m.nombre)} | $valor | ${m.unidad} | " +
+                        "${escapar(m.detalle.ifBlank { m.motivoSinDato })} |",
                 )
             }
             appendLine()
@@ -433,14 +480,25 @@ object Informe {
             appendLine()
             appendLine("```text")
             d.medidas.filter { it.medida }.forEach { m ->
-                appendLine("${m.nombre.take(26).padEnd(26)} ${barra(m.valor ?: 0.0, topeVisible(m), 20)} " +
-                    "${formato(m.valor ?: 0.0)} ${m.unidad}")
+                if (m.esCategoria) {
+                    // Sin barra: un estado no tiene proporción, y una barra vacía junto a un «0.00»
+                    // dice «aquí no hay nada» cuando el sistema acaba de declarar algo.
+                    appendLine("${m.nombre.take(26).padEnd(26)} ${m.texto}")
+                } else {
+                    appendLine("${m.nombre.take(26).padEnd(26)} ${barra(m.valor ?: 0.0, topeVisible(m), 20)} " +
+                        "${formato(m.valor ?: 0.0)} ${m.unidad}")
+                }
             }
             val sinMedir = d.medidas.filterNot { it.medida }
             if (sinMedir.isNotEmpty()) {
                 appendLine()
                 appendLine("no medido en este teléfono:")
                 sinMedir.forEach { appendLine("  · ${it.nombre} — ${it.motivoSinDato}") }
+            }
+            if (d.sinEjecutar.isNotEmpty()) {
+                appendLine()
+                appendLine("no ejecutado porque el perfil no lo marca:")
+                d.sinEjecutar.forEach { appendLine("  · $it") }
             }
             appendLine("```")
             appendLine()

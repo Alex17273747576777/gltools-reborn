@@ -61,12 +61,14 @@ object ReglasDiagnostico {
     )
 
     /** Desde qué nivel el calor ya está afectando al teléfono, según la propia documentación. */
+    const val NIVEL_PREOCUPA = 3
+
     fun preocupa(etiqueta: String): Boolean {
         val i = ESTADOS_TERMICOS.indexOfFirst { it.first == etiqueta }
-        return i >= 3
+        return i >= NIVEL_PREOCUPA
     }
 
-    fun termico(etiqueta: String?, api: Int): Medida {
+    fun termico(etiqueta: String?, api: Int, fallo: String = ""): Medida {
         if (api < 29) {
             return Medida(
                 NOMBRE_TERMICO, null, "",
@@ -75,7 +77,18 @@ object ReglasDiagnostico {
             )
         }
         if (etiqueta == null) {
-            return Medida(NOMBRE_TERMICO, null, "", "", "el sistema no devolvió estado térmico")
+            // Dos causas distintas y no se confunden: o el sistema lanzó algo al preguntarle, o no
+            // contestó. Decir «no devolvió nada» cuando hubo una excepción es afirmar lo que no se
+            // sabe, y esconde del usuario que su fabricante rompió la API.
+            return if (fallo.isNotBlank()) {
+                Medida(
+                    NOMBRE_TERMICO, null, "",
+                    "el sistema lanzó un fallo al preguntar por el estado térmico",
+                    "getCurrentThermalStatus falló en este teléfono: $fallo",
+                )
+            } else {
+                Medida(NOMBRE_TERMICO, null, "", "", "el sistema no devolvió estado térmico")
+            }
         }
         val i = ESTADOS_TERMICOS.indexOfFirst { it.first == etiqueta }
         if (i < 0) {
@@ -91,6 +104,7 @@ object ReglasDiagnostico {
             "nivel 0-6",
             ESTADOS_TERMICOS[i].second + " · es un NIVEL declarado por el sistema en la escala de " +
                 "esta app, no una temperatura en grados ni el valor numérico de Android",
+            texto = "${ESTADOS_TERMICOS[i].second} (nivel $i de 6)",
         )
     }
 
@@ -99,11 +113,23 @@ object ReglasDiagnostico {
      * estrangulamiento serio. La documentación lo llama "estimate": es una ESTIMACIÓN del sistema,
      * y se etiqueta como tal, igual que el ancho de banda del enlace de red.
      */
-    fun margenTermico(margen: Float?, api: Int): Medida = when {
+    fun margenTermico(margen: Float?, api: Int, fallo: String = ""): Medida = when {
         api < 30 -> Medida(
             NOMBRE_MARGEN, null, "",
             "getThermalHeadroom existe desde la API 30; este teléfono está en la $api",
             "la API 30 es el mínimo para getThermalHeadroom y este teléfono no llega",
+        )
+        fallo.isNotBlank() -> Medida(
+            NOMBRE_MARGEN, null, "",
+            "el sistema lanzó un fallo al preguntar por el margen térmico",
+            "getThermalHeadroom falló en este teléfono: $fallo",
+        )
+        // Hay fabricantes que devuelven NaN cuando no saben. Pintarlo como si fuera un margen, o
+        // peor, como un cero, sería inventarse un dato que el teléfono no dio.
+        margen != null && margen.isNaN() -> Medida(
+            NOMBRE_MARGEN, null, "",
+            "el sistema devolvió NaN: no sabe cuánto margen térmico queda",
+            "getThermalHeadroom contestó NaN, que no es un margen",
         )
         margen == null -> Medida(NOMBRE_MARGEN, null, "", "", "el sistema no devolvió margen térmico")
         else -> Medida(
@@ -151,6 +177,15 @@ object ReglasDiagnostico {
 
     /** Cuánto dura la prueba de CPU. El perfil lo elige (150/400/1000) y antes se ignoraba. */
     fun msCpu(msCpu: Int): Long = msCpu.coerceIn(50, 5000).toLong()
+
+    /**
+     * Las pruebas que el perfil dejó fuera, con su nombre legible. Van en el informe: desde 1.14.0
+     * una prueba desmarcada no aparece, y no aparecer no es lo mismo que decir por qué no está.
+     */
+    fun noElegidas(pruebas: Set<String>, profundo: Boolean): List<String> {
+        val corren = seleccion(pruebas, profundo)
+        return ETIQUETAS.filter { it.first !in corren }.map { it.second.first }
+    }
 
     /*
      * Cada clave con su nombre legible y lo que mide DE VERDAD. Van aquí, y no escritas a mano en

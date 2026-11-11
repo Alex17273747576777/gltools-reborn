@@ -146,6 +146,14 @@ object ReglasPerfilDiagnostico {
         d.medidas.firstOrNull { it.nombre == "Almacenamiento libre" }?.let { m ->
             if (m.valor != null && m.valor < 500) salida += "quedan ${m.valor.toInt()} MB de almacenamiento"
         }
+        // 1.15.1: leer el estado térmico y sólo pintarlo era leerlo a medias. Si el sistema declara
+        // estrangulamiento serio o peor, se avisa, igual que con la memoria y la batería.
+        d.medidas.firstOrNull { it.nombre == ReglasDiagnostico.NOMBRE_TERMICO }?.let { m ->
+            val nivel = m.valor
+            if (nivel != null && nivel >= ReglasDiagnostico.NIVEL_PREOCUPA) {
+                salida += "el sistema declara estrangulamiento térmico (nivel ${nivel.toInt()} de 6)"
+            }
+        }
         return salida
     }
 }

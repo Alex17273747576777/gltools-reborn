@@ -2649,6 +2649,80 @@ run {
         }
     }
 
+    // ── 1.15.1: lo que se declaró con evidencia de teléfono ──
+    //
+    // Un usuario instaló la 1.14.0 y el estado térmico le salió raro. Al mirarlo aparecieron tres
+    // defectos del mismo género: enseñar como número lo que no es un número, y afirmar lo que no se
+    // sabe. El estado térmico se metió en `Medida.valor` como nivel 0-6 y la pantalla hizo lo que
+    // toca con un número: barra vacía y «0.00», que se lee como si no hubiera dato. Y envolver la
+    // lectura en un getOrNull() convertía «el fabricante lanzó una excepción» en «el sistema no
+    // devolvió nada».
+    println()
+    println("── 1.15.1 · categorías con palabras, fallos con su causa, y lo que no corrió se dice ──")
+    run {
+        val RD = io.github.labandita.glreborn.core.ReglasDiagnostico
+        val PD = io.github.labandita.glreborn.core.PerfilDiagnostico
+        val RPD = io.github.labandita.glreborn.core.ReglasPerfilDiagnostico
+        val D = io.github.labandita.glreborn.core
+
+        val none = RD.termico("NONE", 34)
+        check("el estado térmico se declara con palabras", none.esCategoria && none.texto.isNotBlank(),
+            none.texto)
+        check("y las palabras dicen el nivel, no lo esconden",
+            none.texto.contains("nivel 0 de 6") && none.texto.contains("sin estrangulamiento"))
+        check("el nivel sigue ahí para quien lo necesite", none.valor == 0.0)
+        check("un nivel serio también se dice con palabras",
+            RD.termico("SEVERE", 34).texto.contains("nivel 3 de 6"))
+        check("el margen sí es una cantidad y se queda con número",
+            !RD.margenTermico(0.5f, 34).esCategoria)
+
+        val fallo = RD.termico(null, 34, "UnsupportedOperationException: sin HAL térmico")
+        check("si el sistema lanzó algo, se dice que lanzó algo",
+            fallo.valor == null && fallo.motivoSinDato.contains("falló"), fallo.motivoSinDato)
+        check("y se enseña la excepción real", fallo.motivoSinDato.contains("UnsupportedOperationException"))
+        check("no se afirma que «no devolvió nada» cuando sí contestó con un fallo",
+            !fallo.motivoSinDato.contains("no devolvió"))
+        check("sin fallo y sin respuesta se sigue diciendo que no hubo respuesta",
+            RD.termico(null, 34).motivoSinDato.contains("no devolvió"))
+        check("el margen hace lo mismo con su propia excepción",
+            RD.margenTermico(null, 34, "SecurityException: no").motivoSinDato.contains("SecurityException"))
+
+        val nan = RD.margenTermico(Float.NaN, 34)
+        check("NaN no se pinta como si fuera un número", nan.valor == null, nan.valor.toString())
+        check("y dice que el sistema no sabe", nan.motivoSinDato.contains("NaN"))
+
+        val caliente = D.DiagnosticoCompleto(
+            cuando = 0L, duracionMs = 1L, equipo = emptyList(),
+            medidas = listOf(RD.termico("SEVERE", 34)), errores = emptyList(),
+        )
+        val frio = D.DiagnosticoCompleto(
+            cuando = 0L, duracionMs = 1L, equipo = emptyList(),
+            medidas = listOf(RD.termico("NONE", 34)), errores = emptyList(),
+        )
+        check("un teléfono estrangulándose avisa",
+            RPD.avisos(caliente, PD()).any { it.contains("estrangulamiento térmico") })
+        check("y uno frío no inventa un aviso", RPD.avisos(frio, PD()).isEmpty())
+
+        val rapido = setOf(PD.MEMORIA, PD.ALMACENAMIENTO, PD.BATERIA)
+        check("se sabe qué pruebas no se ejecutaron",
+            RD.noElegidas(rapido, profundo = false).size == RD.ETIQUETAS.size - 3,
+            RD.noElegidas(rapido, profundo = false).toString())
+        check("y se nombran como las ve el usuario, no por su clave interna",
+            RD.noElegidas(rapido, profundo = false).let { it.contains("Red") && !it.contains("red") })
+        check("con todo marcado no queda nada por explicar",
+            RD.noElegidas(PD.TODAS, profundo = true).isEmpty())
+        check("en rápido la RAM entra en la lista aunque esté marcada",
+            RD.noElegidas(PD.TODAS, profundo = false).contains("Velocidad de memoria"))
+
+        val md = D.Informe.markdown(frio.copy(sinEjecutar = listOf("Red", "Vulkan")), "prueba", "x")
+        check("el informe en Markdown lista lo que no se ejecutó",
+            md.contains("no ejecutado porque el perfil no lo marca") && md.contains("· Red"))
+        check("y una categoría no sale como «0.00» en la tabla",
+            !md.contains("| 0.00 |") && md.contains("sin estrangulamiento térmico (nivel 0 de 6)"))
+        check("ni con barra vacía en el resumen",
+            !md.lines().any { it.contains("Estado térmico") && it.contains("░") })
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

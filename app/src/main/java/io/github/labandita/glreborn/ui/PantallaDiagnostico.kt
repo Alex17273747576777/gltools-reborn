@@ -304,11 +304,21 @@ private fun FilaMedida(m: Medida) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(m.nombre, fontSize = 13.sp, color = Cristal.texto, fontWeight = FontWeight.Medium)
             Text(
-                if (m.medida) "${Informe.barra(m.valor ?: 0.0, tope(m), 10)} ${formato(m)} ${m.unidad}"
-                else "no medido",
+                when {
+                    // Una categoría con palabras. En 1.14.0 el estado térmico salía aquí como
+                    // «░░░░░░░░░░ 0.00 nivel 0-6»: barra vacía y un cero que se leen como «no hay
+                    // dato» cuando el sistema acababa de declarar «sin estrangulamiento».
+                    m.esCategoria -> m.texto
+                    m.medida -> "${Informe.barra(m.valor ?: 0.0, tope(m), 10)} ${formato(m)} ${m.unidad}"
+                    else -> "no medido"
+                },
                 fontSize = 12.sp,
-                color = if (m.medida) Cristal.marca else Cristal.textoTenue,
-                fontFamily = FontFamily.Monospace,
+                color = when {
+                    m.esCategoria -> Cristal.texto
+                    m.medida -> Cristal.marca
+                    else -> Cristal.textoTenue
+                },
+                fontFamily = if (m.esCategoria) FontFamily.Default else FontFamily.Monospace,
             )
         }
         Text(
