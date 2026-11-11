@@ -127,12 +127,15 @@ object Informes {
         version: String,
         profundo: Boolean,
         conSonido: Boolean,
+        pruebas: Set<String> = PerfilDiagnostico.TODAS,
+        msCpu: Int = 400,
     ): ResultadoInforme {
         val fallos = mutableListOf<Pair<String, String>>()
         val rutas = mutableListOf<String>()
         val erroresPrevios: List<String> =
             io.github.labandita.glreborn.RegistroFallos.leer(context)?.lines()?.take(30) ?: emptyList()
-        val diag = Autodiagnostico.ejecutar(context, profundo = profundo, erroresPrevios = erroresPrevios)
+        val diag = Autodiagnostico.ejecutar(context, profundo = profundo, erroresPrevios = erroresPrevios,
+            pruebas = pruebas, msCpu = msCpu)
         val sello = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.US)
             .format(java.util.Date())
         val md = Informe.markdown(diag, version, RegistroErrores.FICHERO)

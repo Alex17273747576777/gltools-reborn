@@ -38,7 +38,13 @@ data class PerfilDiagnostico(
         const val RAM = "ram"
         const val IO = "io"
 
-        val TODAS = setOf(MEMORIA, ALMACENAMIENTO, BATERIA, CPU, VULKAN, RED, RAM, IO)
+        /** Nuevo en la 1.14.0: estado térmico y margen térmico del sistema. */
+        const val TERMICO = "termico"
+
+        val TODAS = setOf(MEMORIA, ALMACENAMIENTO, BATERIA, CPU, TERMICO, VULKAN, RED, RAM, IO)
+
+        /** Lo que era «todas» antes de existir la prueba térmica. Sirve para migrar, no para elegir. */
+        val TODAS_ANTERIORES = setOf(MEMORIA, ALMACENAMIENTO, BATERIA, CPU, VULKAN, RED, RAM, IO)
     }
 }
 
@@ -64,9 +70,13 @@ object ReglasPerfilDiagnostico {
         if (mem != p.umbralMemoriaPct) avisos += "el umbral de memoria se ajustó a $mem % (50–99)"
         val bat = p.umbralBateriaC.coerceIn(30.0, 60.0)
         if (bat != p.umbralBateriaC) avisos += "el umbral de batería se ajustó a $bat °C (30–60)"
-        val pruebas = p.pruebas.intersect(PerfilDiagnostico.TODAS)
+        val migradas = migrar(p.pruebas)
+        if (migradas.size != p.pruebas.size) {
+            avisos += "el perfil se guardó antes de existir la prueba térmica: «todas» ahora la incluye"
+        }
+        val pruebas = migradas.intersect(PerfilDiagnostico.TODAS)
         if (pruebas.isEmpty()) avisos += "sin ninguna prueba marcada se mide lo mínimo: memoria y estado"
-        if (pruebas.size != p.pruebas.size) avisos += "se descartaron pruebas que no existen"
+        if (pruebas.size != migradas.size) avisos += "se descartaron pruebas que no existen"
         val nombre = p.nombre.trim().ifBlank {
             avisos += "el perfil no tenía nombre: se llamó «Personalizado»"
             "Personalizado"
@@ -101,7 +111,7 @@ object ReglasPerfilDiagnostico {
             nombre = mapa["nombre"]?.takeIf { it.isNotBlank() } ?: base.nombre,
             profundo = mapa["profundo"]?.equals("true", true) ?: base.profundo,
             pruebas = mapa["pruebas"]?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
-                ?.toSet() ?: base.pruebas,
+                ?.toSet()?.let { migrar(it) } ?: base.pruebas,
             msCpu = mapa["msCpu"]?.toIntOrNull() ?: base.msCpu,
             umbralMemoriaPct = mapa["umbralMemoriaPct"]?.toIntOrNull() ?: base.umbralMemoriaPct,
             umbralBateriaC = mapa["umbralBateriaC"]?.toDoubleOrNull() ?: base.umbralBateriaC,
@@ -109,6 +119,14 @@ object ReglasPerfilDiagnostico {
             conSonido = mapa["conSonido"]?.equals("true", true) ?: base.conSonido,
         )
     }
+
+    /**
+     * Un perfil guardado antes de la 1.14.0 que decía «todas» sigue queriendo decir «todas»: la
+     * prueba térmica es nueva y el usuario no la desmarcó, simplemente no existía. Migrar no es
+     * añadir pruebas que nadie pidió, es no quitarle al que pidió todo.
+     */
+    fun migrar(pruebas: Set<String>): Set<String> =
+        if (pruebas == PerfilDiagnostico.TODAS_ANTERIORES) PerfilDiagnostico.TODAS else pruebas
 
     /** ¿Hay que avisar de algo con estas medidas? Devuelve las que se pasan del umbral. */
     fun avisos(d: DiagnosticoCompleto, p: PerfilDiagnostico): List<String> {

@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
+import android.os.PowerManager
 import android.os.Build
 import android.os.StatFs
 import android.os.SystemClock
@@ -139,8 +140,11 @@ object Autodiagnostico {
     }
 
     /**
-     * Carga de CPU: se hace trabajo real (una suma de punto flotante que no se puede optimizar)
-     * y se cuenta cuántas operaciones por segundo salen. Relativo a este teléfono, no a AnTuTu.
+     * Trabajo real de punto flotante (una suma que el compilador no puede optimizar) y cuántas
+     * operaciones por segundo salen. Relativo a este teléfono, no a AnTuTu.
+     *
+     * Desde la 1.14.0 el nombre y el texto los pone `ReglasDiagnostico`, que es pura y se puede
+     * probar: antes se llamaba «Carga de CPU» y no medía carga ninguna.
      */
     fun cargaCpu(ms: Long = 400): Medida {
         var x = 1.000001
@@ -151,15 +155,36 @@ object Autodiagnostico {
             vueltas += 20_000
         }
         val transcurrido = (SystemClock.elapsedRealtime() - t0).coerceAtLeast(1)
-        if (x == 0.0 || vueltas == 0L) {
-            return Medida("Carga de CPU", null, "Mops/s", "", "la prueba no llegó a completar un bloque")
-        }
-        return Medida(
-            "Carga de CPU",
-            vueltas / 1_000_000.0 / (transcurrido / 1000.0),
-            "Mops/s",
-            "operaciones de punto flotante por segundo en un solo hilo, $ms ms · " +
-                "${Runtime.getRuntime().availableProcessors()} núcleos disponibles",
+        val hechas = if (x == 0.0) 0L else vueltas
+        return ReglasDiagnostico.cpu(
+            hechas, transcurrido, ms, Runtime.getRuntime().availableProcessors(),
+        )
+    }
+
+    /**
+     * Lo único que Android publica sobre calor sin root: el estado térmico (API 29) y el margen
+     * (API 30). NO son grados. La temperatura de la batería sí son grados y va en [bateria]; la de
+     * la CPU no tiene API pública y [temperaturaCpu] lo declara en vez de suponerla.
+     */
+    fun termico(context: Context): List<Medida> {
+        val api = Build.VERSION.SDK_INT
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val etiqueta = if (api >= 29 && pm != null) runCatching {
+            when (pm.currentThermalStatus) {
+                PowerManager.THERMAL_STATUS_NONE -> "NONE"
+                PowerManager.THERMAL_STATUS_LIGHT -> "LIGHT"
+                PowerManager.THERMAL_STATUS_MODERATE -> "MODERATE"
+                PowerManager.THERMAL_STATUS_SEVERE -> "SEVERE"
+                PowerManager.THERMAL_STATUS_CRITICAL -> "CRITICAL"
+                PowerManager.THERMAL_STATUS_EMERGENCY -> "EMERGENCY"
+                PowerManager.THERMAL_STATUS_SHUTDOWN -> "SHUTDOWN"
+                else -> "OTRO(${pm.currentThermalStatus})"
+            }
+        }.getOrNull() else null
+        val margen = if (api >= 30 && pm != null) runCatching { pm.getThermalHeadroom(10) }.getOrNull() else null
+        return listOf(
+            ReglasDiagnostico.termico(etiqueta, api),
+            ReglasDiagnostico.margenTermico(margen, api),
         )
     }
 
@@ -197,12 +222,13 @@ object Autodiagnostico {
         val f = File(context.cacheDir, "diag-io.bin")
         val escritura = try {
             val t0 = System.nanoTime()
-            f.outputStream().use { it.write(bloque) }
+            // Con fsync: sin él se mide sobre todo la caché de páginas, y el número que sale no es
+            // lo que tardó el almacenamiento sino lo que tardó la RAM en fingir que escribía.
+            java.io.FileOutputStream(f).use { it.write(bloque); it.fd.sync() }
             val ns = (System.nanoTime() - t0).coerceAtLeast(1)
-            Medida("Escritura en almacenamiento", bloque.size / (ns / 1e9) / (1024 * 1024), "MB/s",
-                "4 MB a la caché de la app, sin fsync")
+            ReglasDiagnostico.escrituraIo(bloque.size, ns, conFsync = true)
         } catch (t: Throwable) {
-            Medida("Escritura en almacenamiento", null, "MB/s", "", "no se pudo escribir: ${t.javaClass.simpleName}")
+            Medida(ReglasDiagnostico.NOMBRE_ESCRITURA, null, "MB/s", "", "no se pudo escribir: ${t.javaClass.simpleName}")
         }
         val lectura = try {
             val t0 = System.nanoTime()
@@ -297,10 +323,25 @@ object Autodiagnostico {
      * Corre todo. `profundo` añade la prueba de I/O y la de memoria; el modo rápido existe porque
      * medir cuesta batería y un teléfono con 4 GB lo nota.
      */
-    fun ejecutar(context: Context, profundo: Boolean = true, erroresPrevios: List<String> = emptyList()): DiagnosticoCompleto {
+    /**
+     * @param pruebas las claves del perfil. Hasta la 1.13.2 este parámetro no existía y el perfil
+     *   prometía «las que no estén marcadas no se ejecutan» sin que fuera verdad: se ejecutaban
+     *   todas. Ahora se respeta, y decide [ReglasDiagnostico.seleccion] para que el teléfono y las
+     *   pruebas usen la misma regla.
+     * @param msCpu lo que el usuario eligió en el perfil (150/400/1000). Antes se ignoraba y se
+     *   usaba `if (profundo) 400 else 150`, así que el selector no servía de nada.
+     */
+    fun ejecutar(
+        context: Context,
+        profundo: Boolean = true,
+        erroresPrevios: List<String> = emptyList(),
+        pruebas: Set<String> = PerfilDiagnostico.TODAS,
+        msCpu: Int = 400,
+    ): DiagnosticoCompleto {
         val t0 = SystemClock.elapsedRealtime()
         val medidas = mutableListOf<Medida>()
         val errores = erroresPrevios.toMutableList()
+        val activa = ReglasDiagnostico.seleccion(pruebas, profundo)
 
         fun intentar(nombre: String, bloque: () -> Medida) {
             try {
@@ -311,16 +352,28 @@ object Autodiagnostico {
             }
         }
 
-        intentar("memoria") { memoria(context) }
-        intentar("almacenamiento") { almacenamiento() }
-        bateria(context).forEach { medidas += it }
-        intentar("cpu") { cargaCpu(if (profundo) 400 else 150) }
-        intentar("cpu-temperatura") { temperaturaCpu(context) }
-        intentar("vulkan") { vulkan(context) }
-        red(context).forEach { medidas += it }
+        fun elegido(clave: String) = clave in activa
+
+        if (elegido(PerfilDiagnostico.MEMORIA)) intentar("memoria") { memoria(context) }
+        if (elegido(PerfilDiagnostico.ALMACENAMIENTO)) intentar("almacenamiento") { almacenamiento() }
+        if (elegido(PerfilDiagnostico.BATERIA)) bateria(context).forEach { medidas += it }
+        if (elegido(PerfilDiagnostico.CPU)) intentar("cpu") { cargaCpu(ReglasDiagnostico.msCpu(msCpu)) }
+        if (elegido(PerfilDiagnostico.TERMICO)) {
+            // La temperatura de la CPU no se puede medir y se declara; el estado térmico sí.
+            intentar("cpu-temperatura") { temperaturaCpu(context) }
+            try {
+                termico(context).forEach { medidas += it }
+            } catch (t: Throwable) {
+                errores += "térmico: ${t.javaClass.simpleName}: ${t.message}"
+                medidas += Medida(ReglasDiagnostico.NOMBRE_TERMICO, null, "", "",
+                    "no se pudo leer el estado térmico: ${t.javaClass.simpleName}")
+            }
+        }
+        if (elegido(PerfilDiagnostico.VULKAN)) intentar("vulkan") { vulkan(context) }
+        if (elegido(PerfilDiagnostico.RED)) red(context).forEach { medidas += it }
         if (profundo) {
-            intentar("ram") { velocidadMemoria() }
-            ioAlmacenamiento(context).forEach { medidas += it }
+            if (elegido(PerfilDiagnostico.RAM)) intentar("ram") { velocidadMemoria() }
+            if (elegido(PerfilDiagnostico.IO)) ioAlmacenamiento(context).forEach { medidas += it }
         }
 
         return DiagnosticoCompleto(

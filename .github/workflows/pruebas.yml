@@ -41,6 +41,43 @@ jobs:
           assert 'fromFile' not in prov, 'file:// fuera de la app revienta en Android 7 o mas'
           assert 'ultimosInformes' in prov, 'compartir debe mirar la carpeta de la app'
           PY
+      - name: La procedencia de los datos cuadra con los ficheros
+        run: |
+          python3 -B - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          raiz = Path('app/src/main/assets/datos')
+          man = json.loads((raiz / 'manifiesto.json').read_text(encoding='utf-8'))
+          ver = man.get('verificacion')
+          assert ver, 'manifiesto.json no declara verificacion: los datos no tienen procedencia'
+          malos = []
+          for f in ver['ficheros']:
+              p = raiz / f['archivo']
+              if not p.is_file():
+                  malos.append((f['archivo'], 'no existe')); continue
+              b = p.read_bytes()
+              if hashlib.sha256(b).hexdigest() != f['sha256']:
+                  malos.append((f['archivo'], 'sha256 declarado no coincide'))
+              if len(b) != f['bytes']:
+                  malos.append((f['archivo'], 'tamano declarado no coincide'))
+          assert not malos, 'procedencia falsa: ' + str(malos)
+          reales = sorted(p.name for p in raiz.iterdir() if p.is_file())
+          declarados = {f['archivo'] for f in ver['ficheros']} | {'manifiesto.json'}
+          sin = [r for r in reales if r not in declarados]
+          assert not sin, 'datos sin hash declarado: ' + str(sin)
+          for c in ver.get('carpetas', []):
+              n = sum(1 for p in (raiz / c['carpeta']).rglob('*') if p.is_file())
+              assert n == c['ficheros'], c['carpeta'] + ': ' + str(n) + ' ficheros, declara ' + str(c['ficheros'])
+          o = ver['origen_dispositivos']
+          assert o['sha256_versionado'] == hashlib.sha256((raiz / 'dispositivos-fuente.csv').read_bytes()).hexdigest()
+          assert isinstance(o['coincide'], bool) and o['deriva']
+          assert 'fecha_de_captura_original' in o and 'por_que_no_hay_fecha' in o
+          dj = json.loads((raiz / 'dispositivos.json').read_text(encoding='utf-8'))
+          assert len(dj['dispositivos']) == o['fichas_versionado'], 'el JSON no cuadra con lo declarado'
+          print('PROCEDENCIA_OK ficheros=' + str(len(ver['ficheros'])) +
+                ' fichas=' + str(len(dj['dispositivos'])) + ' deriva_declarada=' + str(not o['coincide']))
+          PY
+
       - name: La version del registro es la del build.gradle
         run: |
           python3 -B - <<'PY'

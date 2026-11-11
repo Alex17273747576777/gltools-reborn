@@ -3,7 +3,7 @@
 Un pendiente que vive en el chat se pierde. Éste es el sitio donde viven, con su criterio de
 cierre: no se tacha nada hasta que se cumpla lo que dice la columna «cierra cuando».
 
-Estado a 1.13.2 (versionCode 29, firmada con la clave original `1ff4c6ee…e803`).
+Estado a 1.14.0 (versionCode 30, firmada con la clave original `1ff4c6ee…e803`).
 
 ## Cerrado en 1.12.1
 
@@ -27,19 +27,30 @@ Estado a 1.13.2 (versionCode 29, firmada con la clave original `1ff4c6ee…e803`
 | Las sondas que escribían no restauraban el estado previo | `settings put global reborn_prueba 1` se quedaba en el sistema para siempre; `setprop debug.…` se ponía a vacío en vez de volver a lo que había. Las dos leen el valor previo, escriben, leen de vuelta y restauran o borran en el mismo comando, con `exit $rc` para que el código sea el de la escritura y no el del eco. Semántica comprobada con `sh` real. |
 | Nombres que prometían más que el comando | «Congelar apps (pm disable-user)» sólo listaba; «Modo rendimiento fijo» sólo miraba la ayuda. Renombrados a lo que de verdad prueban, con prueba que impide que vuelvan. |
 
+## Cerrado en 1.14.0
+
+| Pendiente | Cómo quedó |
+|---|---|
+| La prueba de CPU se llamaba «Carga de CPU» | Medía operaciones de punto flotante por segundo en un solo hilo, que no es la carga. Renombrada a «Velocidad de CPU (un hilo)» y el detalle dice que no es la carga ni una puntuación comparable con AnTuTu. Con prueba que impide que el nombre vuelva. |
+| El perfil prometía cosas que no hacía | `PerfilDiagnostico` decía «las pruebas que no estén marcadas no se ejecutan» y `ejecutar` no recibía la lista: se ejecutaban todas. El selector de duración de CPU (150/400/1000 ms) tampoco llegaba a ningún sitio. Ambos se aplican ahora con la misma regla pura (`ReglasDiagnostico.seleccion`) en el teléfono y en las pruebas, y los perfiles antiguos que decían «todas» se migran a las nueve claves con aviso. |
+| El calor del teléfono no se leía aunque Android lo publica | Nuevo: `getCurrentThermalStatus` (API 29) y `getThermalHeadroom` (API 30), enseñados como niveles declarados por el sistema con las descripciones literales de la documentación oficial, nunca como grados. Los valores numéricos de `THERMAL_STATUS_*` no están publicados, así que se compara contra las constantes simbólicas. |
+| La escritura se medía sin `fsync` | Medía sobre todo la caché de páginas. Ahora hace `fsync` y el detalle dice si lo hizo, porque cambia lo que significa la cifra. |
+| Datos de terceros sin procedencia verificable | `manifiesto.json` lleva el sha256 y el tamaño de cada fichero de datos, el hash y la fecha del origen oficial descargado, y la deriva declarada (el origen de Google tiene hoy 18 fichas más y va en UTF-16LE). El CI los recalcula en cada push y falla si algún dato viaja sin hash. La fecha de captura original NO se registró nunca y va en `null` con el motivo. |
+
 ## Abiertos, por orden de trabajo
 
 | # | Pendiente | Cierra cuando |
 |---|---|---|
-| 1 | Auto-diagnóstico profundo: temperatura, RAM medida, almacenamiento, batería, y que el informe diga qué NO se pudo medir sin root. | Hay motor en `core/`, pruebas que lo cubren y una pantalla que enseña crudo + interpretación. Sin estimaciones presentadas como medidas. |
+| 1 | Auto-diagnóstico profundo: temperatura, RAM medida, almacenamiento, batería, y que el informe diga qué NO se pudo medir sin root. | **Cerrado en código en 1.14.0**: el estado térmico y el margen del sistema ya se leen, la temperatura de la CPU se sigue declarando «no medido» con su motivo, la escritura hace `fsync`, y toda la interpretación vive en `ReglasDiagnostico` con pruebas. Sin estimaciones presentadas como medidas. Falta la comprobación en teléfono → pendiente 9. |
 | 2 | Informe `.md` al cerrar la app, guardado en Documentos **y** botón de compartir. | Se genera sin que el usuario lo pida, se puede sacar por el selector de Android, y las dos cosas tienen prueba. |
 | 3 | Volcado de errores (timestamps, códigos, descripción) junto al informe. | Existe el fichero, incluye lo de `RegistroErrores` y lo de las pruebas de compatibilidad, sin datos personales. |
-| 4 | Catálogo de dispositivos ampliado (mobolist Top AnTuTu y más) con importación reproducible. | Cada ficha tiene fuente, fecha de captura y `sha256` del origen; nada metido a mano de memoria. |
+| 4 | Catálogo de dispositivos ampliado (mobolist Top AnTuTu y más) con importación reproducible. | **Procedencia cerrada en 1.14.0** (hash por fichero, origen verificado y deriva declarada en el propio APK). Falta la parte de «ampliado»: reimportar las 18 fichas nuevas del origen de Google y añadir más fuentes, cosa que no se hace a ciegas sin poder probar el resultado en un teléfono. |
 | 5 | Perfiles personalizados de diagnóstico en JSON (detalle, muestreo, pruebas, umbrales). | Se crean, se guardan, se cargan al iniciar y una prueba demuestra ida y vuelta. |
 | 6 | Aplicación **profunda y verificada**, sin simulaciones parciales: se comprueba el efecto leyendo después de escribir, y lo que no se puede leer se declara. | `Ejecutor`, `Sistema` y `Apps` ya leían de vuelta antes de decir «aplicado»; el agujero que quedaba era el clasificador de penetración, cerrado en 1.13.2. Falta la comprobación en teléfono → pendiente 9. |
 | 7 | Modo de penetración de sistema (qué se puede y qué no sin root real). | **Cerrado en código en 1.13.2**: el clasificador exige código de salida y las sondas que escriben restauran lo que había. Sigue sin probarse en un teléfono real → eso es el pendiente 9. Nada de `persist.sys.*` inventado, `rc.local` ni Device Owner como si dieran root. |
-| 8 | Importación del catálogo sorteando el bloqueo del sitio (sin bots). | Se obtiene por la vía legítima y reproducible, con la fecha y el hash guardados. |
+| 8 | Importación del catálogo sorteando el bloqueo del sitio (sin bots). | **Premisa corregida en 1.14.0**: el catálogo que viaja en el APK NO viene de un sitio bloqueado, viene del CSV oficial de Google Play (`storage.googleapis.com/play_public/supported_devices.csv`), que se descarga sin problema y cuyo hash quedó guardado en el manifiesto. Lo que sí estaba bloqueado (versus.com, desafío anti-bot en su `robots.txt`) sigue sin rastrearse y está declarado en `fuentes_no_usadas`. No se sortea ningún bloqueo. |
 | 9 | **Verificar en un teléfono real** que compartir abre el selector y entrega el `.md` y el `.txt`, y que el informe se escribe de verdad en Documentos. | Hay una captura o un registro del teléfono, no sólo pruebas de JVM. Todo lo cerrado en 1.13.1 está probado en código, no en dispositivo: hasta que no haya teléfono, eso es lo que se puede afirmar. |
+| 10 | Casillas en la interfaz para elegir qué pruebas se ejecutan. | **Nuevo en 1.14.0**: el perfil ya se respeta (`ejecutar` recibe `pruebas` y `msCpu`), pero la pantalla sólo deja elegir duración de CPU y umbrales. Con menos de nueve pruebas sólo se llega por los perfiles de fábrica («Rápido») o importando un JSON a mano. Cierra cuando la pantalla permita marcar cada prueba y una prueba JVM demuestre que lo marcado es exactamente lo que se ejecuta. |
 
 ## Límites que no se van a cruzar
 

@@ -2463,6 +2463,128 @@ run {
                 .contains("ajustes-diagnostico.txt"))
     }
 
+    // ── 1.14.0: lo que se mide se llama como lo que es, el perfil se respeta, y los datos
+    // dicen de dónde vienen ──
+    //
+    // Tres vicios del mismo género. Uno: la prueba de CPU se llamaba «Carga de CPU» y mide
+    // operaciones por segundo en un hilo, que no es la carga. Dos: el perfil prometía «las pruebas
+    // que no estén marcadas no se ejecutan» y el selector de duración de CPU existía, pero
+    // `ejecutar` no recibía ninguna de las dos cosas: se ejecutaba todo y siempre 400/150 ms.
+    // Tres: 54.434 fichas de catálogo viajaban en el APK sin hash del origen ni fecha de captura,
+    // y el origen oficial de Google hoy tiene 18 fichas más y va en otra codificación. Ni se
+    // inventa la fecha ni se maquilla la diferencia: se declaran las dos cosas.
+    println()
+    println("── 1.14.0 · nombres honestos, perfil que se cumple y procedencia verificable ──")
+    run {
+        val RD = io.github.labandita.glreborn.core.ReglasDiagnostico
+        val PD = io.github.labandita.glreborn.core.PerfilDiagnostico
+        val RP = io.github.labandita.glreborn.core.ReglasProcedencia
+        val RPD = io.github.labandita.glreborn.core.ReglasPerfilDiagnostico
+
+        val cpu = RD.cpu(40_000_000L, 400L, 400L, 8)
+        check("la prueba de CPU ya no se llama «Carga de CPU»", cpu.nombre == RD.NOMBRE_CPU &&
+            !cpu.nombre.contains("Carga"), cpu.nombre)
+        check("y su detalle dice que es un solo hilo y no una puntuación",
+            cpu.detalle.contains("UN SOLO HILO") && cpu.detalle.contains("no es la carga"))
+        check("el número sale de las vueltas y el tiempo, no de la nada",
+            cpu.valor != null && kotlin.math.abs(cpu.valor!! - 100.0) < 0.001, cpu.valor.toString())
+        check("sin vueltas no hay medida que enseñar", RD.cpu(0L, 400L, 400L, 8).valor == null)
+        check("y lo dice con motivo", RD.cpu(0L, 400L, 400L, 8).motivoSinDato.isNotBlank())
+
+        check("por debajo de API 29 no hay estado térmico y se dice",
+            RD.termico(null, 26).let { it.valor == null && it.motivoSinDato.contains("API") })
+        check("el estado NONE es nivel 0 y no preocupa", RD.termico("NONE", 34).valor == 0.0 &&
+            !RD.preocupa("NONE"))
+        check("SEVERE es nivel 3 y sí preocupa", RD.termico("SEVERE", 34).valor == 3.0 &&
+            RD.preocupa("SEVERE"))
+        check("SHUTDOWN es el último nivel", RD.termico("SHUTDOWN", 34).valor == 6.0)
+        check("los siete estados están, en el orden de la documentación",
+            RD.ESTADOS_TERMICOS.map { it.first } ==
+                listOf("NONE", "LIGHT", "MODERATE", "SEVERE", "CRITICAL", "EMERGENCY", "SHUTDOWN"))
+        check("el detalle deja claro que no son grados",
+            RD.termico("MODERATE", 34).detalle.contains("no una temperatura en grados"))
+        check("un estado desconocido no se traduce a un nivel inventado",
+            RD.termico("OTRO(99)", 34).let { it.valor == null && it.motivoSinDato.contains("99") })
+        check("sin respuesta del sistema no se afirma nada", RD.termico(null, 34).valor == null)
+
+        check("por debajo de API 30 no hay margen y se dice",
+            RD.margenTermico(null, 29).let { it.valor == null && it.motivoSinDato.contains("API 30") })
+        check("el margen se declara como estimación del sistema",
+            RD.margenTermico(0.5f, 34).let { it.valor == 0.5 && it.detalle.contains("estimación") })
+
+        check("con fsync el detalle lo dice", RD.escrituraIo(4 * 1048576, 200_000_000L, true)
+            .detalle.contains("con fsync"))
+        check("sin fsync avisa de que puede ser la caché", RD.escrituraIo(4 * 1048576, 200_000_000L, false)
+            .detalle.contains("SIN fsync"))
+        check("y el nombre es el mismo en los dos casos", RD.escrituraIo(4 * 1048576, 1L, true).nombre ==
+            RD.escrituraIo(4 * 1048576, 1L, false).nombre)
+        check("sin bytes no hay velocidad", RD.escrituraIo(0, 100L, true).valor == null)
+
+        // El perfil se cumple: lo que no está marcado no se ejecuta, y la duración elegida se usa.
+        check("la prueba térmica tiene su clave y está en TODAS",
+            PD.TERMICO in PD.TODAS && PD.TODAS.size == PD.TODAS_ANTERIORES.size + 1)
+        check("un perfil rápido ejecuta sólo lo que promete",
+            RD.seleccion(setOf(PD.MEMORIA, PD.ALMACENAMIENTO, PD.BATERIA), profundo = false) ==
+                setOf(PD.MEMORIA, PD.ALMACENAMIENTO, PD.BATERIA))
+        check("lo profundo no se hace si el perfil dice rápido",
+            RD.seleccion(PD.TODAS, profundo = false).let { PD.RAM !in it && PD.IO !in it })
+        check("y sí se hace si dice completo",
+            RD.seleccion(PD.TODAS, profundo = true).let { PD.RAM in it && PD.IO in it && PD.TERMICO in it })
+        check("una clave inventada no se cuela", "invento" !in RD.seleccion(PD.TODAS + "invento", true))
+        check("la duración de CPU que elige el usuario se usa, no se ignora",
+            RD.msCpu(1000) == 1000L && RD.msCpu(150) == 150L)
+        check("y una imposible se recorta al rango que ya validaba el perfil",
+            RD.msCpu(99_999) == 5000L && RD.msCpu(1) == 50L)
+        check("un perfil viejo que decía «todas» sigue diciendo «todas»",
+            RPD.migrar(PD.TODAS_ANTERIORES) == PD.TODAS)
+        check("pero uno que desmarcó algo no recibe pruebas que no pidió",
+            RPD.migrar(setOf(PD.MEMORIA, PD.CPU)) == setOf(PD.MEMORIA, PD.CPU))
+        check("validar un perfil antiguo lo migra y lo dice",
+            RPD.validar(PD(pruebas = PD.TODAS_ANTERIORES)).let { par ->
+                par.first.pruebas == PD.TODAS && par.second.any { it.contains("térmica") } })
+
+        // Procedencia: se lee el manifiesto REAL del APK, no una copia de mentira. Se busca subiendo
+        // desde el directorio de trabajo, porque pruebasNucleo arranca dentro del módulo.
+        val manArchivo = generateSequence(java.io.File("").absoluteFile) { it.parentFile }
+            .map { java.io.File(it, "app/src/main/assets/datos/manifiesto.json") }
+            .firstOrNull { it.exists() }
+        check("el manifiesto de datos está donde se le busca", manArchivo != null,
+            java.io.File("").absolutePath)
+        if (manArchivo != null) {
+            val man = org.json.JSONObject(manArchivo.readText())
+            val ver = man.optJSONObject("verificacion")
+            check("el manifiesto declara verificación de procedencia", ver != null)
+            if (ver != null) {
+                val decl = RP.declarados(ver)
+                check("todos los catálogos declaran su hash", decl.size >= 7, decl.toString())
+                check("el CSV de Google tiene su sha256 declarado",
+                    RP.shaDe(ver, "dispositivos-fuente.csv")?.length == 64)
+                check("un fichero que no existe no tiene hash inventado",
+                    RP.shaDe(ver, "no-existe.json") == null)
+                val reales = manArchivo.parentFile!!.listFiles { f -> f.isFile }!!.map { it.name }
+                check("ningún dato viaja sin procedencia", RP.sinDeclarar(ver, reales).isEmpty(),
+                    RP.sinDeclarar(ver, reales).toString())
+                val o = ver.optJSONObject("origen_dispositivos")
+                check("el origen oficial declara hash, fecha y codificación",
+                    o != null && o.optString("sha256_origen").length == 64 &&
+                        o.optString("descargado_el").isNotBlank() &&
+                        o.optString("codificacion_origen").isNotBlank())
+                check("y la diferencia con la copia incluida se declara, no se esconde",
+                    o != null && !o.optBoolean("coincide") && o.optString("deriva").contains("fichas"))
+                check("la fecha de captura original NO se inventa",
+                    o != null && o.isNull("fecha_de_captura_original") &&
+                        o.optString("por_que_no_hay_fecha").contains("inventarla"))
+                val lineas = RP.lineas(ver)
+                check("lo que se enseña dice que el origen y la copia no coinciden",
+                    lineas.any { it.contains("NO coinciden") })
+                check("y dice que la fecha de captura no se registró",
+                    lineas.any { it.contains("NO se registró") })
+            }
+        }
+        check("sin bloque de verificación se dice que falta, no se calla",
+            RP.lineas(null).any { it.contains("SIN bloque de verificación") })
+    }
+
     println()
     if (fallos == 0) println("TODAS LAS PRUEBAS PASAN")
     else println("$fallos PRUEBAS FALLARON")

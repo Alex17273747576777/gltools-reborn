@@ -60,5 +60,69 @@
    "url": "https://versus.com/es",
    "por_que": "Su robots.txt responde con un desafío anti-bot: no permite el acceso automatizado. Se leyó una ficha a mano para comparar (el Tecno Spark 20C coincide con la ficha técnica), pero no se rastrea en bloque."
   }
- ]
+ ],
+ "verificacion": {
+  "verificado_el": "2026-11-11",
+  "metodo": "sha256 y tamaño calculados sobre los ficheros versionados, y descarga del origen oficial declarada en el mismo momento. Lo comprueba pruebas.yml en cada push: si un dato cambia y su hash declarado no, el CI falla.",
+  "ficheros": [
+   {
+    "archivo": "android.json",
+    "bytes": 1799,
+    "sha256": "0dd3e61400aec8678f37084fbaa48e3d1822792555d0b4cc499240b9e38e066e"
+   },
+   {
+    "archivo": "antutu.json",
+    "bytes": 24581,
+    "sha256": "bc8bfc403267930fb660938b240096a53a6828d8f66279594aa1f84df7d810f8"
+   },
+   {
+    "archivo": "dispositivos-fuente.csv",
+    "bytes": 1976584,
+    "sha256": "7300f8599f2f4353096fe940dbe8756411c367c18bc57586d215ea06a761b7d3"
+   },
+   {
+    "archivo": "dispositivos.json",
+    "bytes": 2520859,
+    "sha256": "060b1c40e30fece06b20bfc4bd6176cae6f038ed2f590ebe9a8e93b5fbab5295"
+   },
+   {
+    "archivo": "gpu.json",
+    "bytes": 17929,
+    "sha256": "64af8f18bff96f51288510184080335585024b8137528f1f462e48021bea9508"
+   },
+   {
+    "archivo": "mobolist.json",
+    "bytes": 956285,
+    "sha256": "0087ce9e6bda81bb0c5046ec752c35b63780f2fd1e3256429d045148576bdf0f"
+   },
+   {
+    "archivo": "soc.json",
+    "bytes": 24749,
+    "sha256": "8fff1f3040d8891922384b1c7d55167a680c0ba5e230953ab8b6f9ac15cdce9f"
+   }
+  ],
+  "carpetas": [
+   {
+    "carpeta": "top500",
+    "ficheros": 29,
+    "sha256_indice": "4fad13b8aadfd74f0f19095f5cba120787a3a13e59760451709815f7b6c75ae7"
+   }
+  ],
+  "origen_dispositivos": {
+   "url": "https://storage.googleapis.com/play_public/supported_devices.csv",
+   "descargado_el": "2026-11-11",
+   "sha256_origen": "634203f9a5fbbb2f42da1ce2020643718f440308a4cc4333b22df58a9aa027e8",
+   "bytes_origen": 4817618,
+   "codificacion_origen": "UTF-16LE",
+   "fichas_origen": 54452,
+   "sha256_versionado": "7300f8599f2f4353096fe940dbe8756411c367c18bc57586d215ea06a761b7d3",
+   "bytes_versionado": 1976584,
+   "codificacion_versionado": "UTF-8",
+   "fichas_versionado": 54434,
+   "coincide": false,
+   "deriva": "El origen publicado por Google tiene hoy 18 fichas más que la copia incluida (54452 frente a 54434), y va en UTF-16LE mientras la copia va en UTF-8. No se maquilla: la copia es una foto anterior transcodificada, no el fichero de origen byte a byte.",
+   "fecha_de_captura_original": null,
+   "por_que_no_hay_fecha": "La fecha de captura original no se registró en ningún sitio cuando se importó. Lo más antiguo verificable es manifiesto.generado (2026-11-09) y la entrada en git del CSV (commit 5c262d9c, 2026-11-10T02:00:37Z). Poner otra fecha sería inventarla."
+  }
+ }
 }

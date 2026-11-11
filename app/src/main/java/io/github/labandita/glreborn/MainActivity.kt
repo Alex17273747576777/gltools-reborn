@@ -134,7 +134,8 @@ class MainActivity : ComponentActivity() {
         val version = Build.VERSION_REBORN
         Thread {
             runCatching {
-                Informes.alCerrar(ctx, version, perfil.profundo, perfil.conSonido)
+                Informes.alCerrar(ctx, version, perfil.profundo, perfil.conSonido,
+                    perfil.pruebas, perfil.msCpu)
             }.onFailure {
                 RegistroErrores.anotar(ctx, "ERROR", "informe de cierre", "${it.javaClass.simpleName}: ${it.message}")
             }
@@ -426,6 +427,12 @@ private fun App(
                         }
                         appendLine()
                         appendLine(m.optString("nota"))
+                        // 1.14.0: la procedencia verificable se enseña con el resto. Un catálogo del
+                        // que no se puede decir de dónde salió ni cuándo es un rumor con formato
+                        // JSON, y la pantalla de Datos es justo donde eso se mira.
+                        io.github.labandita.glreborn.core.ReglasProcedencia
+                            .lineas(m.optJSONObject("verificacion"))
+                            .forEach { appendLine(it) }
                     }
                 }.getOrNull()
             }
@@ -589,7 +596,8 @@ private fun App(
                 // La medición dura décimas de segundo pero se hace fuera del hilo de dibujo: una
                 // prueba de CPU dentro de la composición congela la interfaz.
                 val d = withContext(Dispatchers.Default) {
-                    Autodiagnostico.ejecutar(contexto, profundo = perfilDiag.profundo)
+                    Autodiagnostico.ejecutar(contexto, profundo = perfilDiag.profundo,
+                        pruebas = perfilDiag.pruebas, msCpu = perfilDiag.msCpu)
                 }
                 diagnosticoAuto = d
                 midiendo = false
