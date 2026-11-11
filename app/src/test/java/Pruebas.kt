@@ -2010,17 +2010,32 @@ run {
 
         // Método penetration: la clasificación, que es donde se suele mentir.
         val rpen = io.github.labandita.glreborn.core.ReglasPenetracion
-        check("sin respuesta no hay capacidad", rpen.clasificar(null, null) == io.github.labandita.glreborn.core.Capacidad.Estado.NO)
+        // 1.13.2: el código de salida es obligatorio para clasificar. Hasta aquí `Shell.Salida`
+        // ya lo traía pero nadie se lo pasaba, y un comando que terminaba mal imprimiendo algo
+        // inocente salía como COMPLETO: una capacidad inexistente pintada en verde.
+        check("sin respuesta no hay capacidad", rpen.clasificar(null, null, true, 0) == Capacidad.Estado.NO)
+        check("sin código de salida no se afirma nada", rpen.clasificar("lo que sea", null, true, null) == Capacidad.Estado.NO)
         check("un comando que no existe no está disponible",
-            rpen.clasificar("Unknown command: foo", null) == io.github.labandita.glreborn.core.Capacidad.Estado.NO)
+            rpen.clasificar("Unknown command: foo", null, true, 0) == Capacidad.Estado.NO)
         check("sin permiso se dice sin permiso",
-            rpen.clasificar("Permission denial: writing to settings", null) == io.github.labandita.glreborn.core.Capacidad.Estado.SIN_PERMISO)
+            rpen.clasificar("Permission denial: writing to settings", null, true, 1) == Capacidad.Estado.SIN_PERMISO)
+        check("el permiso se mira antes que el código de salida",
+            rpen.clasificar("Permission denial: writing to settings", null, true, 0) == Capacidad.Estado.SIN_PERMISO)
         check("si el valor no queda, es limitado, no completo",
-            rpen.clasificar("0", "1") == io.github.labandita.glreborn.core.Capacidad.Estado.LIMITADO)
+            rpen.clasificar("0", "1", true, 0) == Capacidad.Estado.LIMITADO)
         check("si queda el valor pedido, es completo",
-            rpen.clasificar("1", "1") == io.github.labandita.glreborn.core.Capacidad.Estado.COMPLETO)
-        check("sin valor esperado, responder ya es completo",
-            rpen.clasificar("lo que sea", null) == io.github.labandita.glreborn.core.Capacidad.Estado.COMPLETO)
+            rpen.clasificar("1", "1", true, 0) == Capacidad.Estado.COMPLETO)
+        check("sin valor esperado, responder con código 0 ya es completo",
+            rpen.clasificar("lo que sea", null, true, 0) == Capacidad.Estado.COMPLETO)
+        // Éste es el fallo concreto: la MISMA salida inocente, con código distinto de cero.
+        check("código distinto de cero no es una capacidad completa",
+            rpen.clasificar("lo que sea", null, true, 1) == Capacidad.Estado.NO)
+        check("ni aunque aparezca el valor esperado si el comando falló",
+            rpen.clasificar("1", "1", true, 1) == Capacidad.Estado.NO)
+        check("código -1 es tiempo agotado, no capacidad",
+            rpen.clasificar("", null, true, -1) == Capacidad.Estado.NO)
+        check("si el comando no existe, ni con código 0",
+            rpen.clasificar("x", null, false, 0) == Capacidad.Estado.NO)
 
         // ── Las dos pruebas de diagnóstico que mentían (2026-11-10) ──
         // Lo que se vio en un teléfono: «Failed to set property 'persist.reborn.prueba'» y
@@ -2094,6 +2109,25 @@ run {
 
         check("todas las pruebas de penetración llevan comando", rpen.PRUEBAS.all { it.second.isNotBlank() })
         check("y ninguna promete root sin probarlo", rpen.PRUEBAS.any { it.second == "su -c id" })
+
+        // 1.13.2: las sondas que ESCRIBEN dejan el teléfono como estaba. La de ajustes globales
+        // se quedaba dentro del sistema: reborn_prueba=1 seguía ahí para siempre.
+        val deEscribir = rpen.PRUEBAS.filter { it.second.contains("settings put") || it.second.contains("setprop") }
+        check("hay sondas que escriben", deEscribir.isNotEmpty(), deEscribir.size.toString())
+        check("todas leen el valor previo antes de escribir", deEscribir.all { it.second.contains("prev=") })
+        check("y todas lo restauran después", deEscribir.all { it.second.contains("\"$prev\"") })
+        check("la de ajustes globales borra la clave si antes no existía",
+            deEscribir.any { it.second.contains("settings delete global reborn_prueba") })
+        check("el código de salida es el de la escritura, no el del eco",
+            deEscribir.all { it.second.trimEnd().endsWith("exit $rc") })
+        check("ninguna sonda escribe una propiedad que SELinux prohíbe sin root",
+            deEscribir.none { it.second.contains("persist.reborn") })
+        // Ningún nombre promete más de lo que su comando prueba de verdad.
+        check("listar apps congeladas no se llama «congelar apps»",
+            rpen.PRUEBAS.none { it.first.startsWith("Congelar") })
+        check("el modo fijo dice que sólo mira la ayuda",
+            rpen.PRUEBAS.first { it.second.contains("set-fixed-performance-mode-enabled") }
+                .first.contains("ayuda"))
     }
 
     println()
