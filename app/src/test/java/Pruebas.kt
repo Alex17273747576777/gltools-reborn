@@ -2661,9 +2661,7 @@ run {
     println("── 1.15.1 · categorías con palabras, fallos con su causa, y lo que no corrió se dice ──")
     run {
         val RD = io.github.labandita.glreborn.core.ReglasDiagnostico
-        val PD = io.github.labandita.glreborn.core.PerfilDiagnostico
         val RPD = io.github.labandita.glreborn.core.ReglasPerfilDiagnostico
-        val D = io.github.labandita.glreborn.core
 
         val none = RD.termico("NONE", 34)
         check("el estado térmico se declara con palabras", none.esCategoria && none.texto.isNotBlank(),
@@ -2691,30 +2689,30 @@ run {
         check("NaN no se pinta como si fuera un número", nan.valor == null, nan.valor.toString())
         check("y dice que el sistema no sabe", nan.motivoSinDato.contains("NaN"))
 
-        val caliente = D.DiagnosticoCompleto(
+        val caliente = DiagnosticoCompleto(
             cuando = 0L, duracionMs = 1L, equipo = emptyList(),
             medidas = listOf(RD.termico("SEVERE", 34)), errores = emptyList(),
         )
-        val frio = D.DiagnosticoCompleto(
+        val frio = DiagnosticoCompleto(
             cuando = 0L, duracionMs = 1L, equipo = emptyList(),
             medidas = listOf(RD.termico("NONE", 34)), errores = emptyList(),
         )
         check("un teléfono estrangulándose avisa",
-            RPD.avisos(caliente, PD()).any { it.contains("estrangulamiento térmico") })
-        check("y uno frío no inventa un aviso", RPD.avisos(frio, PD()).isEmpty())
+            RPD.avisos(caliente, PerfilDiagnostico()).any { it.contains("estrangulamiento térmico") })
+        check("y uno frío no inventa un aviso", RPD.avisos(frio, PerfilDiagnostico()).isEmpty())
 
-        val rapido = setOf(PD.MEMORIA, PD.ALMACENAMIENTO, PD.BATERIA)
+        val rapido = setOf(PerfilDiagnostico.MEMORIA, PerfilDiagnostico.ALMACENAMIENTO, PerfilDiagnostico.BATERIA)
         check("se sabe qué pruebas no se ejecutaron",
             RD.noElegidas(rapido, profundo = false).size == RD.ETIQUETAS.size - 3,
             RD.noElegidas(rapido, profundo = false).toString())
         check("y se nombran como las ve el usuario, no por su clave interna",
             RD.noElegidas(rapido, profundo = false).let { it.contains("Red") && !it.contains("red") })
         check("con todo marcado no queda nada por explicar",
-            RD.noElegidas(PD.TODAS, profundo = true).isEmpty())
+            RD.noElegidas(PerfilDiagnostico.TODAS, profundo = true).isEmpty())
         check("en rápido la RAM entra en la lista aunque esté marcada",
-            RD.noElegidas(PD.TODAS, profundo = false).contains("Velocidad de memoria"))
+            RD.noElegidas(PerfilDiagnostico.TODAS, profundo = false).contains("Velocidad de memoria"))
 
-        val md = D.Informe.markdown(frio.copy(sinEjecutar = listOf("Red", "Vulkan")), "prueba", "x")
+        val md = Informe.markdown(frio.copy(sinEjecutar = listOf("Red", "Vulkan")), "prueba", "x")
         check("el informe en Markdown lista lo que no se ejecutó",
             md.contains("no ejecutado porque el perfil no lo marca") && md.contains("· Red"))
         check("y una categoría no sale como «0.00» en la tabla",
