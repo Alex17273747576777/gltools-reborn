@@ -1632,8 +1632,16 @@ run {
         if (sup != null) {
             val s = sup.readText()
             check("la sección de la mira explica cómo se usa", s.contains("CÓMO SE USA"))
+            // En 1.16.0 el paso 1 dejó de estar escrito a mano en la pantalla y pasó a salir de
+            // `ReglasPromesas`, porque una promesa no puede vivir lejos del hecho del que depende.
+            // La comprobación NO se relaja: se hace más exigente. Antes buscaba un literal en el
+            // fuente, que es lo que permitió que dijera «es el único permiso» siendo falso; ahora
+            // comprueba el texto REAL que se pinta, en las dos variantes de API.
+            val rp = io.github.labandita.glreborn.core.ReglasPromesas
             check("explica los tres pasos, no sólo el permiso",
-                s.contains("Dale permiso") && s.contains("Actívala") && s.contains("Abre el juego"))
+                rp.permisosSuperposicion(32).contains("Dale permiso") &&
+                    rp.permisosSuperposicion(33).contains("Dale permiso") &&
+                    s.contains("Actívala") && s.contains("Abre el juego"))
             check("y dice que deja pasar los toques, que es la duda real",
                 s.contains("sin tapar los toques"))
         }
