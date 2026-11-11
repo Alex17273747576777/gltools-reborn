@@ -71,7 +71,7 @@ object ReglasDiagnostico {
             return Medida(
                 NOMBRE_TERMICO, null, "",
                 "Android sólo publica el estado térmico a partir de la API 29; este teléfono está en la $api",
-                "la API del teléfono no ofrece getCurrentThermalStatus",
+                "la API 29 es el mínimo para getCurrentThermalStatus y este teléfono no llega",
             )
         }
         if (etiqueta == null) {
@@ -103,7 +103,7 @@ object ReglasDiagnostico {
         api < 30 -> Medida(
             NOMBRE_MARGEN, null, "",
             "getThermalHeadroom existe desde la API 30; este teléfono está en la $api",
-            "la API del teléfono no ofrece margen térmico",
+            "la API 30 es el mínimo para getThermalHeadroom y este teléfono no llega",
         )
         margen == null -> Medida(NOMBRE_MARGEN, null, "", "", "el sistema no devolvió margen térmico")
         else -> Medida(
