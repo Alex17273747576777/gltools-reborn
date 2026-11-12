@@ -30,6 +30,8 @@ jobs:
         run: python3 -B .github/scripts/version_actual.py
       - name: Probar lectura segura del JSON de firma
         run: python3 -B .github/scripts/test_preparar_firma.py
+      - name: Probar el censo del APK antes de usarlo
+        run: python3 -B .github/scripts/test_censo_apk.py
       - name: Preparar clave existente, nunca generar otra
         id: clave
         env:

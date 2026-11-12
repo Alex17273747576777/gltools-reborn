@@ -13,6 +13,7 @@ CERTIFICADO = "1ff4c6ee90263a73a7ea6097de5b1f31bcd049c805e384904d2087b4c6c9e803"
 # Escribirla en dos sitios hizo que la 1.12.2 fallara la publicación con un APK correcto.
 sys.path.insert(0, str(Path(__file__).parent))
 from version_actual import leer as leer_version  # noqa: E402
+from censo_apk import comprobar  # noqa: E402
 
 VERSION, CODIGO = leer_version()
 raiz = Path(sys.argv[1])
@@ -58,11 +59,24 @@ for apk in archivos:
         assert firma.returncode != 0 and "UNSIGNED-NO-INSTALAR" in apk.name
     with zipfile.ZipFile(apk) as z:
         contenidos.append({n: hashlib.sha256(z.read(n)).hexdigest() for n in z.namelist() if n.startswith("assets/") and not n.endswith("/")})
-    filas.append({"nombre": apk.name, "bytes": apk.stat().st_size, "sha256": hashlib.sha256(apk.read_bytes()).hexdigest()})
+    es_cruda = "sin-comprimir" in apk.name
+    censo = comprobar(apk, crudo=es_cruda)
+    filas.append({"nombre": apk.name, "bytes": apk.stat().st_size,
+                  "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(),
+                  "abis": censo["abis"], "nativas": censo["nativas"],
+                  "nativas_comprimidas": censo["nativas_comprimidas"],
+                  "nativas_almacenadas": censo["nativas_almacenadas"],
+                  "datos": censo["datos"],
+                  "datos_comprimidos": censo["datos_comprimidos"],
+                  "datos_almacenados": censo["datos_almacenados"]})
 assert contenidos[0] == contenidos[1], "Los assets de ambas variantes deben ser idénticos"
 assert max(a['bytes'] for a in filas) > 3 * min(a['bytes'] for a in filas), "La variante sin comprimir no tiene el tamaño esperado"
+assert filas[0]["abis"] == filas[1]["abis"], "Las dos variantes deben llevar las mismas ABI"
 (raiz / "SHA256SUMS.txt").write_text("".join(f"{a['sha256']}  {a['nombre']}\n" for a in filas))
 datos = {"version": VERSION, "version_code": CODIGO, "commit": os.environ["GITHUB_SHA"], "firmado": firmado,
+         "universal": filas[0]["abis"],
+         "empaquetado": {"normal": "datos comprimidos, nativas almacenadas (AGP moderno)",
+                         "cruda": "datos sin comprimir, nativas comprimidas"},
          "certificado_sha256": CERTIFICADO if firmado else None, "apks": filas,
          "limites": "Sin prueba física, arranque ni garantía de compatibilidad del Power HAL."}
 (raiz / "verificacion.json").write_text(json.dumps(datos, indent=2) + "\n")
